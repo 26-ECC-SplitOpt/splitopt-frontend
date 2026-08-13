@@ -4,7 +4,6 @@ import styled from '@emotion/styled';
 import Header from '../components/Header';
 import TitleBar from '../components/TitleBar';
 import { colors } from '../styles/colors';
-import { getCurrentUser } from '../utils/auth';
 
 const Page = styled.div`
   display: flex;
@@ -151,19 +150,25 @@ function formatAmount(amount) {
 function MySettlement() {
   const navigate = useNavigate();
   const { groupId } = useParams();
-  const [settlements, setSettlements] = useState([]);
-  const currentUser = getCurrentUser();
-  const myName = currentUser?.name ?? '';
+  const [toSend, setToSend] = useState([]);
+  const [toReceive, setToReceive] = useState([]);
+  const [completed, setCompleted] = useState([]);
+
+  const applySettlementsMe = (data) => {
+    setToSend(data.toSend);
+    setToReceive(data.toReceive);
+    setCompleted(data.completed);
+  };
 
   useEffect(() => {
     let ignore = false;
 
     async function fetchSettlements() {
-      const response = await fetch(`/api/groups/${groupId}/settlements`);
+      const response = await fetch(`/api/groups/${groupId}/settlements/me`);
       const result = await response.json();
 
       if (!ignore && result.success) {
-        setSettlements(result.data.settlements);
+        applySettlementsMe(result.data);
       }
     }
 
@@ -174,37 +179,30 @@ function MySettlement() {
     };
   }, [groupId]);
 
-  async function updateStatus(settlementId, status) {
+  async function updateStatus(settlementId, action) {
     const response = await fetch(
-      `/api/groups/${groupId}/settlements/${settlementId}`,
+      `/api/groups/${groupId}/settlements/${settlementId}/status`,
       {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ action }),
       },
     );
     const result = await response.json();
 
     if (result.success) {
-      setSettlements((prev) =>
-        prev.map((item) =>
-          item.id === settlementId ? { ...item, status } : item,
-        ),
+      // SEND/CONFIRM으로 상태가 바뀌면 보낼/받을/완료 목록 간 이동이 필요해서
+      // 단일 항목만 patch하지 않고 /me를 다시 불러온다.
+      const refetchResponse = await fetch(
+        `/api/groups/${groupId}/settlements/me`,
       );
+      const refetchResult = await refetchResponse.json();
+
+      if (refetchResult.success) {
+        applySettlementsMe(refetchResult.data);
+      }
     }
   }
-
-  const toSend = settlements.filter(
-    (item) => item.from === myName && item.status !== 'CONFIRMED',
-  );
-  const toReceive = settlements.filter(
-    (item) => item.to === myName && item.status !== 'CONFIRMED',
-  );
-  const completed = settlements.filter(
-    (item) =>
-      (item.from === myName || item.to === myName) &&
-      item.status === 'CONFIRMED',
-  );
 
   return (
     <Page>
@@ -218,19 +216,25 @@ function MySettlement() {
           {toSend.length > 0 ? (
             <Box>
               {toSend.map((item) => (
-                <ItemRow key={item.id}>
-                  <ItemName>{item.to}</ItemName>
+                <ItemRow key={item.settlementId}>
+                  <ItemName>{item.counterpartName}</ItemName>
                   <ItemRight>
                     <ItemAmount>{formatAmount(item.amount)}</ItemAmount>
                     {item.status === 'SENT' ? (
-                      <SentBadge type="button" disabled>
-                        송금 완료
+                      <SentBadge
+                        type="button"
+                        clickable
+                        onClick={() =>
+                          updateStatus(item.settlementId, 'CANCEL')
+                        }
+                      >
+                        송금 완료/취소
                       </SentBadge>
                     ) : (
                       <PendingBadge
                         type="button"
                         clickable
-                        onClick={() => updateStatus(item.id, 'SENT')}
+                        onClick={() => updateStatus(item.settlementId, 'SEND')}
                       >
                         송금 전
                       </PendingBadge>
@@ -251,15 +255,17 @@ function MySettlement() {
           {toReceive.length > 0 ? (
             <Box>
               {toReceive.map((item) => (
-                <ItemRow key={item.id}>
-                  <ItemName>{item.from}</ItemName>
+                <ItemRow key={item.settlementId}>
+                  <ItemName>{item.counterpartName}</ItemName>
                   <ItemRight>
                     <ItemAmount>{formatAmount(item.amount)}</ItemAmount>
                     {item.status === 'SENT' ? (
                       <SentBadge
                         type="button"
                         clickable
-                        onClick={() => updateStatus(item.id, 'CONFIRMED')}
+                        onClick={() =>
+                          updateStatus(item.settlementId, 'CONFIRM')
+                        }
                       >
                         송금 확인
                       </SentBadge>
@@ -284,10 +290,8 @@ function MySettlement() {
           {completed.length > 0 ? (
             <Box>
               {completed.map((item) => (
-                <ItemRow key={item.id}>
-                  <ItemName>
-                    {item.from === myName ? item.to : item.from}
-                  </ItemName>
+                <ItemRow key={item.settlementId}>
+                  <ItemName>{item.counterpartName}</ItemName>
                   <ItemAmount>{formatAmount(item.amount)}</ItemAmount>
                 </ItemRow>
               ))}

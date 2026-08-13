@@ -282,17 +282,42 @@ function GroupSettings() {
 
   const [group, setGroup] = useState(null);
   const [name, setName] = useState('');
-  const [memo, setMemo] = useState('');
+  const [description, setDescription] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [copyLabel, setCopyLabel] = useState('복사');
-  const [members, setMembers] = useState([]);
+  const [isReissuing, setIsReissuing] = useState(false);
+  const [participants, setParticipants] = useState([]);
   const [isEditingMembers, setIsEditingMembers] = useState(false);
+  const [isInviteExpired, setIsInviteExpired] = useState(false);
+  const [removingUserId, setRemovingUserId] = useState(null);
   const nameInputRef = useRef(null);
   const memoInputRef = useRef(null);
 
-  const removeMemberAt = (index) => {
-    setMembers((prev) => prev.filter((_, i) => i !== index));
+  const handleRemoveParticipant = async (userId) => {
+    if (removingUserId) return;
+
+    setRemovingUserId(userId);
+    setError('');
+
+    try {
+      const response = await fetch(
+        `/api/groups/${groupId}/participants/${userId}`,
+        { method: 'DELETE' },
+      );
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        setError(result.message ?? '참여자를 삭제하지 못했습니다.');
+        return;
+      }
+
+      setParticipants((prev) => prev.filter((p) => p.userId !== userId));
+    } catch {
+      setError('오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+    } finally {
+      setRemovingUserId(null);
+    }
   };
 
   const focusNameInput = () => {
@@ -313,8 +338,13 @@ function GroupSettings() {
       if (!ignore && result.success) {
         setGroup(result.data);
         setName(result.data.name);
-        setMemo(result.data.memo ?? '');
-        setMembers(result.data.members ?? []);
+        setDescription(result.data.description ?? '');
+        setParticipants(result.data.participants ?? []);
+        setIsInviteExpired(
+          result.data.inviteExpiresAt
+            ? new Date(result.data.inviteExpiresAt).getTime() < Date.now()
+            : false,
+        );
       }
     }
 
@@ -337,6 +367,39 @@ function GroupSettings() {
     }
   };
 
+  const handleReissueCode = async () => {
+    if (isReissuing) return;
+
+    setIsReissuing(true);
+    setError('');
+
+    try {
+      const response = await fetch(`/api/groups/${groupId}/invite`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        setError(result.message ?? '초대 코드 재발급에 실패했습니다.');
+        return;
+      }
+
+      setGroup((prev) => ({
+        ...prev,
+        inviteCode: result.data.inviteCode,
+        inviteExpiresAt: result.data.expiresAt,
+      }));
+      setCopyLabel('복사');
+      setIsInviteExpired(false);
+    } catch {
+      setError('오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+    } finally {
+      setIsReissuing(false);
+    }
+  };
+
   const handleSave = async (event) => {
     event.preventDefault();
     setError('');
@@ -346,7 +409,7 @@ function GroupSettings() {
       const response = await fetch(`/api/groups/${groupId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, memo, members }),
+        body: JSON.stringify({ name, description }),
       });
 
       const result = await response.json();
@@ -371,8 +434,23 @@ function GroupSettings() {
 
     if (!confirmed) return;
 
-    await fetch(`/api/groups/${groupId}`, { method: 'DELETE' });
-    navigate('/groups');
+    setError('');
+
+    try {
+      const response = await fetch(`/api/groups/${groupId}`, {
+        method: 'DELETE',
+      });
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        setError(result.message ?? '모임을 삭제하지 못했습니다.');
+        return;
+      }
+
+      navigate('/groups');
+    } catch {
+      setError('오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+    }
   };
 
   return (
@@ -400,8 +478,16 @@ function GroupSettings() {
               <CardLabel>초대 코드 생성</CardLabel>
               <Row>
                 <CodeBox>{group?.inviteCode ?? ''}</CodeBox>
-                <CopyButton type="button" onClick={handleCopyCode}>
-                  {copyLabel}
+                <CopyButton
+                  type="button"
+                  onClick={isInviteExpired ? handleReissueCode : handleCopyCode}
+                  disabled={isReissuing}
+                >
+                  {isInviteExpired
+                    ? isReissuing
+                      ? '재발급 중...'
+                      : '재발급'
+                    : copyLabel}
                 </CopyButton>
               </Row>
             </SettingsCard>
@@ -431,8 +517,8 @@ function GroupSettings() {
                 <EditableInput
                   ref={memoInputRef}
                   placeholder="메모를 입력하세요"
-                  value={memo}
-                  onChange={(event) => setMemo(event.target.value)}
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
                 />
                 <IconButton
                   type="button"
@@ -449,13 +535,14 @@ function GroupSettings() {
               <MembersRow>
                 {isEditingMembers ? (
                   <ChipList>
-                    {members.map((member, index) => (
-                      <MemberChip key={`${member}-${index}`}>
-                        {member}
+                    {participants.map((p) => (
+                      <MemberChip key={p.userId}>
+                        {p.name}
                         <RemoveChipButton
                           type="button"
-                          aria-label={`${member} 삭제`}
-                          onClick={() => removeMemberAt(index)}
+                          aria-label={`${p.name} 삭제`}
+                          onClick={() => handleRemoveParticipant(p.userId)}
+                          disabled={removingUserId === p.userId}
                         >
                           <XIcon />
                         </RemoveChipButton>
@@ -463,7 +550,9 @@ function GroupSettings() {
                     ))}
                   </ChipList>
                 ) : (
-                  <MemberText>{members.join(' ⋅ ')}</MemberText>
+                  <MemberText>
+                    {participants.map((p) => p.name).join(' ⋅ ')}
+                  </MemberText>
                 )}
                 <OutlineButton
                   type="button"

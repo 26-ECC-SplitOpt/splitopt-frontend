@@ -9,6 +9,8 @@ import InviteJoin from './pages/InviteJoin';
 import SettleResult from './pages/SettleResult';
 import MySettlement from './pages/MySettlement';
 import MyInfo from './pages/MyInfo';
+import ExpenseForm from './pages/ExpenseForm';
+import ExpenseDetail from './pages/ExpenseDetail';
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
@@ -16,75 +18,26 @@ function App() {
     <Routes>
       <Route path="/" element={<Login />} />
       <Route path="/signup" element={<SignUp />} />
-      <Route path="/groups" element={<GroupList />} />
-      <Route
-        path="/groups/new"
-        element={
-          <ProtectedRoute>
-            <GroupCreate />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/groups/join"
-        element={
-          <ProtectedRoute>
-            <InviteJoin />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/groups/:groupId"
-        element={
-          <ProtectedRoute>
-            <GroupDetail />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/groups/:groupId/settings"
-        element={
-          <ProtectedRoute>
-            <GroupSettings />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/groups/:groupId/members"
-        element={<div>참여자 관리 페이지 준비 중</div>}
-      />
-      <Route
-        path="/groups/:groupId/expenses/new"
-        element={<div>지출 등록 페이지 준비 중</div>}
-      />
-      <Route
-        path="/groups/:groupId/expenses/:expenseId"
-        element={<div>지출 상세 페이지 준비 중</div>}
-      />
-      <Route
-        path="/groups/:groupId/settle"
-        element={
-          <ProtectedRoute>
-            <SettleResult />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/groups/:groupId/settle/me"
-        element={
-          <ProtectedRoute>
-            <MySettlement />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/me"
-        element={
-          <ProtectedRoute>
-            <MyInfo />
-          </ProtectedRoute>
-        }
-      />
+
+      <Route element={<ProtectedRoute />}>
+        <Route path="/groups" element={<GroupList />} />
+        <Route path="/groups/new" element={<GroupCreate />} />
+        <Route path="/groups/join" element={<InviteJoin />} />
+        <Route path="/groups/:groupId" element={<GroupDetail />} />
+        <Route path="/groups/:groupId/settings" element={<GroupSettings />} />
+        <Route path="/groups/:groupId/expenses/new" element={<ExpenseForm />} />
+        <Route
+          path="/groups/:groupId/expenses/:expenseId/edit"
+          element={<ExpenseForm />}
+        />
+        <Route
+          path="/groups/:groupId/expenses/:expenseId"
+          element={<ExpenseDetail />}
+        />
+        <Route path="/groups/:groupId/settle" element={<SettleResult />} />
+        <Route path="/groups/:groupId/settle/me" element={<MySettlement />} />
+        <Route path="/me" element={<MyInfo />} />
+      </Route>
     </Routes>
   );
 }

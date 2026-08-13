@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import styled from '@emotion/styled';
 import Header from '../components/Header';
 import { colors } from '../styles/colors';
-import { getCurrentUser } from '../utils/auth';
 
 const Page = styled.div`
   display: flex;
@@ -133,10 +132,7 @@ function InviteJoin() {
       const response = await fetch('/api/groups/join', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          inviteCode: code.trim(),
-          name: getCurrentUser()?.name,
-        }),
+        body: JSON.stringify({ inviteCode: code.trim() }),
       });
       const result = await response.json();
 
@@ -145,7 +141,7 @@ function InviteJoin() {
         return;
       }
 
-      navigate(`/groups/${result.data.group.id}`);
+      navigate(`/groups/${result.data.groupId}`);
     } catch {
       setError('오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
     } finally {

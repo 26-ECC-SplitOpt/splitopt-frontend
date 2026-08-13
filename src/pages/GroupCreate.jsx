@@ -43,7 +43,7 @@ const Form = styled.form`
 function GroupCreate() {
   const navigate = useNavigate();
   const [name, setName] = useState('');
-  const [memo, setMemo] = useState('');
+  const [description, setDescription] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -56,7 +56,7 @@ function GroupCreate() {
       const response = await fetch('/api/groups', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, memo }),
+        body: JSON.stringify({ name, description }),
       });
 
       const result = await response.json();
@@ -99,13 +99,13 @@ function GroupCreate() {
           </Field>
 
           <Field>
-            <Label htmlFor="memo">메모(선택)</Label>
+            <Label htmlFor="description">메모(선택)</Label>
             <Input
-              id="memo"
+              id="description"
               type="text"
               placeholder="메모를 입력하세요"
-              value={memo}
-              onChange={(event) => setMemo(event.target.value)}
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
             />
           </Field>
 

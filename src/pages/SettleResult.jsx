@@ -175,12 +175,12 @@ function SettleResult() {
         {hasSettlements ? (
           <List>
             {settlements.map((settlement) => (
-              <Row key={settlement.id}>
+              <Row key={settlement.settlementId}>
                 <RowNames>
                   <RowText>
-                    {settlement.from} → {settlement.to}
+                    {settlement.fromName} → {settlement.toName}
                   </RowText>
-                  {settlement.status === 'CONFIRMED' && (
+                  {settlement.status === 'COMPLETED' && (
                     <DoneBadge>정산 완료</DoneBadge>
                   )}
                 </RowNames>
