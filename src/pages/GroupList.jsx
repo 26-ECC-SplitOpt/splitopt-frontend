@@ -6,7 +6,7 @@ import { ChevronRightIcon } from '../components/icons';
 import { colors } from '../styles/colors';
 
 const STATUS_META = {
-  PENDING: {
+  NOT_STARTED: {
     label: '정산 전',
     color: '#FF2828',
     background: 'rgba(255, 40, 40, 0.12)',
@@ -16,7 +16,7 @@ const STATUS_META = {
     color: '#9F0EFF',
     background: 'rgba(159, 14, 255, 0.12)',
   },
-  COMPLETED: {
+  DONE: {
     label: '정산 완료',
     color: '#12B100',
     background: 'rgba(18, 177, 0, 0.12)',
@@ -75,11 +75,10 @@ const Card = styled(Link)`
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 24px 20px 24px 28px;
+  padding: 32px 24px 32px 28px;
   background-color: ${colors.white};
   border: 1px solid ${colors.border};
-  border-radius: 16px;
-  box-shadow: 0 4px 12px rgba(37, 45, 55, 0.06);
+  border-radius: 20px;
   text-decoration: none;
   cursor: pointer;
 `;
@@ -113,8 +112,8 @@ const CardRight = styled.div`
 `;
 
 const StatusBadge = styled.span`
-  padding: 5px 14px;
-  border-radius: 14px;
+  padding: 8px 16px;
+  border-radius: 16px;
   font-family: 'Inter', sans-serif;
   font-weight: 500;
   font-size: 14px;
@@ -203,13 +202,15 @@ function GroupList() {
         {hasGroups && (
           <CardList>
             {groups.map((group) => {
-              const status = STATUS_META[group.status];
+              const status = STATUS_META[group.settlementStatus];
 
               return (
-                <Card key={group.id} to={`/groups/${group.id}`}>
+                <Card key={group.groupId} to={`/groups/${group.groupId}`}>
                   <CardInfo>
                     <CardTitle>{group.name}</CardTitle>
-                    <CardSubtitle>참여 인원 {group.memberCount}명</CardSubtitle>
+                    <CardSubtitle>
+                      참여 인원 {group.participantCount}명
+                    </CardSubtitle>
                   </CardInfo>
                   <CardRight>
                     <StatusBadge

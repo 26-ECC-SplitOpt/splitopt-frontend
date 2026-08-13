@@ -6,6 +6,7 @@ import TitleBar from '../components/TitleBar';
 import { ChevronRightIcon } from '../components/icons';
 import { getCategoryIcon } from '../utils/categoryIcon';
 import { colors } from '../styles/colors';
+import { getCurrentUser } from '../utils/auth';
 
 const Page = styled.div`
   display: flex;
@@ -250,31 +251,45 @@ function GroupDetail() {
   const navigate = useNavigate();
   const { groupId } = useParams();
   const [group, setGroup] = useState(null);
+  const [expenses, setExpenses] = useState([]);
   const [isSettling, setIsSettling] = useState(false);
 
   useEffect(() => {
     let ignore = false;
 
-    async function fetchGroup() {
-      const response = await fetch(`/api/groups/${groupId}`);
-      const result = await response.json();
+    async function fetchData() {
+      const [groupResponse, expensesResponse] = await Promise.all([
+        fetch(`/api/groups/${groupId}`),
+        fetch(`/api/groups/${groupId}/expenses`),
+      ]);
+      const groupResult = await groupResponse.json();
+      const expensesResult = await expensesResponse.json();
 
-      if (!ignore && result.success) {
-        setGroup(result.data);
+      if (!ignore) {
+        if (groupResult.success) setGroup(groupResult.data);
+        if (expensesResult.success) {
+          setExpenses(expensesResult.data.expenses ?? []);
+        }
       }
     }
 
-    fetchGroup();
+    fetchData();
 
     return () => {
       ignore = true;
     };
   }, [groupId]);
 
-  const expenses = group?.expenses ?? [];
   const hasExpenses = expenses.length > 0;
-  const totalAmount = expenses.reduce((sum, item) => sum + item.amount, 0);
-  const memberCount = group?.members?.length ?? 0;
+  const totalAmount =
+    group?.totalAmount ?? expenses.reduce((sum, item) => sum + item.amount, 0);
+  const memberCount = group?.memberCount ?? 0;
+
+  const currentUser = getCurrentUser();
+  const myParticipant = (group?.participants ?? []).find(
+    (p) => p.userId === currentUser?.userId,
+  );
+  const isOwner = myParticipant?.role === 'OWNER';
 
   async function handleSettle() {
     if (isSettling) return;
@@ -302,19 +317,21 @@ function GroupDetail() {
       <Content>
         <TitleBar
           title={group?.name ?? ''}
-          onBack={() => navigate(-1)}
+          onBack={() => navigate('/groups')}
           rightAction={
-            <Link
-              to={`/groups/${groupId}/settings`}
-              aria-label="모임 설정"
-              style={{ display: 'flex' }}
-            >
-              <SettingsIcon />
-            </Link>
+            isOwner ? (
+              <Link
+                to={`/groups/${groupId}/settings`}
+                aria-label="모임 설정"
+                style={{ display: 'flex' }}
+              >
+                <SettingsIcon />
+              </Link>
+            ) : null
           }
         />
 
-        {group?.memo && <MemoText>{group.memo}</MemoText>}
+        {group?.description && <MemoText>{group.description}</MemoText>}
 
         <SummaryCard>
           <StatBlock>
@@ -348,15 +365,17 @@ function GroupDetail() {
 
               return (
                 <ExpenseRow
-                  key={expense.id}
-                  to={`/groups/${groupId}/expenses/${expense.id}`}
+                  key={expense.expenseId}
+                  to={`/groups/${groupId}/expenses/${expense.expenseId}`}
                 >
                   <ExpenseIconWrap>
                     <CategoryIcon />
                   </ExpenseIconWrap>
                   <ExpenseInfo>
-                    <ExpenseCategory>{expense.category}</ExpenseCategory>
-                    <ExpensePayer>{expense.payer}</ExpensePayer>
+                    <ExpenseCategory>
+                      {expense.title ?? expense.category}
+                    </ExpenseCategory>
+                    <ExpensePayer>{expense.payerName}</ExpensePayer>
                   </ExpenseInfo>
                   <ExpenseAmount>{formatAmount(expense.amount)}</ExpenseAmount>
                   <ChevronRightIcon color="rgba(29, 31, 34, 0.82)" />

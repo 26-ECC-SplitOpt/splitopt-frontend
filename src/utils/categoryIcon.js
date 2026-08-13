@@ -1,11 +1,18 @@
-import { FoodIcon, CarIcon, SparkleIcon } from '../components/icons';
+import {
+  FoodIcon,
+  CarIcon,
+  HomeIcon,
+  ActivityIcon,
+  BagIcon,
+  EtcIcon,
+} from '../components/icons';
 
 const CATEGORY_ICON_RULES = [
-  {
-    keywords: ['식사', '카페', '점심', '저녁', '아침', '커피'],
-    Icon: FoodIcon,
-  },
-  { keywords: ['교통', '택시', '버스', '기차', '주유'], Icon: CarIcon },
+  { keywords: ['식비'], Icon: FoodIcon },
+  { keywords: ['교통'], Icon: CarIcon },
+  { keywords: ['숙박'], Icon: HomeIcon },
+  { keywords: ['활동'], Icon: ActivityIcon },
+  { keywords: ['쇼핑'], Icon: BagIcon },
 ];
 
 export function getCategoryIcon(category = '') {
@@ -13,5 +20,5 @@ export function getCategoryIcon(category = '') {
     item.keywords.some((keyword) => category.includes(keyword)),
   );
 
-  return rule ? rule.Icon : SparkleIcon;
+  return rule ? rule.Icon : EtcIcon;
 }

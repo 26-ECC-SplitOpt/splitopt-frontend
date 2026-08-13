@@ -4,7 +4,7 @@ import styled from '@emotion/styled';
 import Header from '../components/Header';
 import TitleBar from '../components/TitleBar';
 import { colors } from '../styles/colors';
-import { clearSession, getAccessToken } from '../utils/auth';
+import { clearSession, getAccessToken, getRefreshToken } from '../utils/auth';
 
 const Page = styled.div`
   display: flex;
@@ -69,7 +69,7 @@ const RowValue = styled.span`
 const RowRight = styled.div`
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
 `;
 
 const NameInput = styled.input`
@@ -170,8 +170,8 @@ function LogoutIcon() {
 function EditIcon() {
   return (
     <svg
-      width="16"
-      height="16"
+      width="15"
+      height="15"
       viewBox="0 0 18 18"
       fill="none"
       aria-hidden="true"
@@ -235,9 +235,19 @@ function MyInfo() {
     };
   }, []);
 
-  const handleLogout = () => {
-    clearSession();
-    navigate('/');
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken: getRefreshToken() }),
+      });
+    } catch {
+      // 서버 호출이 실패해도 클라이언트 세션은 정리한다.
+    } finally {
+      clearSession();
+      navigate('/');
+    }
   };
 
   const startEditingName = () => {

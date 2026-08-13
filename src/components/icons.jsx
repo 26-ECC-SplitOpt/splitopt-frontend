@@ -10,24 +10,124 @@ export function FoodIcon({ size = 20, color = colors.body }) {
       aria-hidden="true"
     >
       <path
-        d="M5 2.5V9a1.5 1.5 0 0 1-3 0V2.5"
+        d="M4.5 2V8M6.5 2V8M8.5 2V8"
+        stroke={color}
+        strokeWidth="1.5"
+        strokeLinecap="round"
+      />
+      <path
+        d="M4.5 8H8.5"
+        stroke={color}
+        strokeWidth="1.3"
+        strokeLinecap="round"
+      />
+      <path
+        d="M7.15 8L7.15 16.3C7.15 17.1 6.9 17.6 6.5 17.6C6.1 17.6 5.85 17.1 5.85 16.3L5.85 8Z"
+        stroke={color}
+        strokeWidth="1.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M11.5 2C14 2.4 14.8 5.5 14.5 8.2C14.35 9.6 13.3 10.4 12.8 10.4L12.8 16.3C12.8 17.1 12.55 17.6 12.15 17.6C11.75 17.6 11.5 17.1 11.5 16.3Z"
+        stroke={color}
+        strokeWidth="1.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function HomeIcon({ size = 20, color = colors.body }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 20 20"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M3 9.5L10 3.3L17 9.5"
         stroke={color}
         strokeWidth="1.4"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
       <path
-        d="M3.5 2.5V17.5"
-        stroke={color}
-        strokeWidth="1.4"
-        strokeLinecap="round"
-      />
-      <path
-        d="M13.5 2.5c-1.4 1.1-2.2 3-2.2 5s.8 3.9 2.2 5v5"
+        d="M5 8.5V16.7H15V8.5"
         stroke={color}
         strokeWidth="1.4"
         strokeLinecap="round"
         strokeLinejoin="round"
+      />
+      <path
+        d="M8.3 16.7V12h3.4v4.7"
+        stroke={color}
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function ActivityIcon({ size = 20, color = colors.body }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 20 20"
+      fill="none"
+      aria-hidden="true"
+    >
+      <circle cx="10" cy="4" r="1.6" fill={color} />
+      <path
+        d="M10 5.6L8 11.5M8 11.5L3 16M8 11.5L12 17M10 7L16 5M9 8L4 9"
+        stroke={color}
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function BagIcon({ size = 20, color = colors.body }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 20 20"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M4.5 7.3H15.5L16.3 17H3.7L4.5 7.3Z"
+        stroke={color}
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M6.7 7.3V6a3.3 3.3 0 0 1 6.6 0V7.3"
+        stroke={color}
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M5.7 10.2H14.3"
+        stroke={color}
+        strokeWidth="0.9"
+        strokeLinecap="round"
+      />
+      <path
+        d="M7.2 10.6V17M12.8 10.6V17"
+        stroke={color}
+        strokeWidth="0.9"
+        strokeLinecap="round"
       />
     </svg>
   );
@@ -43,30 +143,34 @@ export function CarIcon({ size = 20, color = colors.body }) {
       aria-hidden="true"
     >
       <path
-        d="M3.5 12V9.5a1.5 1.5 0 0 1 1-1.42l1-2.7a1.5 1.5 0 0 1 1.4-1H13a1.5 1.5 0 0 1 1.4 1l1 2.7a1.5 1.5 0 0 1 1 1.42V12"
+        d="M5 8.5L6.8 4.3H13.2L15 8.5Z"
         stroke={color}
         strokeWidth="1.4"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      <path
-        d="M2.5 12h15v3a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-1h-9v1a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-3Z"
+      <rect
+        x="2"
+        y="8.5"
+        width="16"
+        height="4.5"
+        rx="1.4"
         stroke={color}
         strokeWidth="1.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
       />
       <path
-        d="M5.5 9.5h9"
+        d="M6 9.9H14"
         stroke={color}
-        strokeWidth="1.4"
+        strokeWidth="1"
         strokeLinecap="round"
       />
+      <circle cx="5.3" cy="14" r="1.8" fill={color} />
+      <circle cx="14.7" cy="14" r="1.8" fill={color} />
     </svg>
   );
 }
 
-export function SparkleIcon({ size = 20, color = colors.body }) {
+export function EtcIcon({ size = 20, color = colors.body }) {
   return (
     <svg
       width={size}
@@ -76,18 +180,10 @@ export function SparkleIcon({ size = 20, color = colors.body }) {
       aria-hidden="true"
     >
       <path
-        d="M10 2.5c.4 2.6 1.2 4 3.9 4.4-2.7.4-3.5 1.8-3.9 4.4-.4-2.6-1.2-4-3.9-4.4 2.7-.4 3.5-1.8 3.9-4.4Z"
+        d="M10 3.2V16.8M4.1 6.6L15.9 13.4M15.9 6.6L4.1 13.4"
         stroke={color}
-        strokeWidth="1.2"
+        strokeWidth="2.6"
         strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M15.2 11c.24 1.5.7 2.3 2.3 2.5-1.6.24-2.06 1-2.3 2.5-.24-1.5-.7-2.26-2.3-2.5 1.6-.2 2.06-1 2.3-2.5Z"
-        stroke={color}
-        strokeWidth="1.1"
-        strokeLinecap="round"
-        strokeLinejoin="round"
       />
     </svg>
   );
