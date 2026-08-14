@@ -4,7 +4,8 @@ import styled from '@emotion/styled';
 import Header from '../components/Header';
 import TitleBar from '../components/TitleBar';
 import { colors } from '../styles/colors';
-import { clearSession, getAccessToken, getRefreshToken } from '../utils/auth';
+import { clearSession, getRefreshToken } from '../utils/auth';
+import { apiFetch } from '../utils/api';
 
 const Page = styled.div`
   display: flex;
@@ -220,7 +221,7 @@ function MyInfo() {
     let ignore = false;
 
     async function fetchMe() {
-      const response = await fetch('/api/me');
+      const response = await apiFetch('/api/me');
       const result = await response.json();
 
       if (!ignore && result.success) {
@@ -237,7 +238,7 @@ function MyInfo() {
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/logout', {
+      await apiFetch('/api/auth/logout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refreshToken: getRefreshToken() }),
@@ -264,12 +265,9 @@ function MyInfo() {
     setNameError('');
 
     try {
-      const response = await fetch('/api/me', {
+      const response = await apiFetch('/api/me', {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${getAccessToken()}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: nameInput }),
       });
       const result = await response.json();

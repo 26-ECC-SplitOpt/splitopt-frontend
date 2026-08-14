@@ -4,6 +4,7 @@ import styled from '@emotion/styled';
 import Header from '../components/Header';
 import TitleBar from '../components/TitleBar';
 import { colors } from '../styles/colors';
+import { apiFetch } from '../utils/api';
 
 const Page = styled.div`
   display: flex;
@@ -138,8 +139,8 @@ function SettleResult() {
 
     async function fetchData() {
       const [groupRes, settlementsRes] = await Promise.all([
-        fetch(`/api/groups/${groupId}`),
-        fetch(`/api/groups/${groupId}/settlements`),
+        apiFetch(`/api/groups/${groupId}`),
+        apiFetch(`/api/groups/${groupId}/settlements`),
       ]);
       const groupResult = await groupRes.json();
       const settlementsResult = await settlementsRes.json();

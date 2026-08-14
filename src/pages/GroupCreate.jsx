@@ -4,6 +4,7 @@ import styled from '@emotion/styled';
 import Header from '../components/Header';
 import TitleBar from '../components/TitleBar';
 import { colors } from '../styles/colors';
+import { apiFetch } from '../utils/api';
 import {
   Field,
   Label,
@@ -53,7 +54,7 @@ function GroupCreate() {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch('/api/groups', {
+      const response = await apiFetch('/api/groups', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, description }),

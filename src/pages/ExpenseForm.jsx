@@ -6,6 +6,7 @@ import Header from '../components/Header';
 import TitleBar from '../components/TitleBar';
 import { colors } from '../styles/colors';
 import { getCurrentUser } from '../utils/auth';
+import { apiFetch } from '../utils/api';
 
 const CATEGORY_OPTIONS = ['식비', '교통', '숙박', '활동', '쇼핑', '기타'];
 
@@ -383,7 +384,7 @@ function ExpenseForm() {
     let ignore = false;
 
     async function fetchGroup() {
-      const response = await fetch(`/api/groups/${groupId}`);
+      const response = await apiFetch(`/api/groups/${groupId}`);
       const result = await response.json();
 
       if (!ignore && result.success) {
@@ -411,8 +412,8 @@ function ExpenseForm() {
 
     async function fetchExpense() {
       const [groupResponse, expenseResponse] = await Promise.all([
-        fetch(`/api/groups/${groupId}`),
-        fetch(`/api/groups/${groupId}/expenses/${expenseId}`),
+        apiFetch(`/api/groups/${groupId}`),
+        apiFetch(`/api/groups/${groupId}/expenses/${expenseId}`),
       ]);
       const groupResult = await groupResponse.json();
       const result = await expenseResponse.json();
@@ -573,7 +574,7 @@ function ExpenseForm() {
       const url = isEditMode
         ? `/api/groups/${groupId}/expenses/${expenseId}`
         : `/api/groups/${groupId}/expenses`;
-      const response = await fetch(url, {
+      const response = await apiFetch(url, {
         method: isEditMode ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

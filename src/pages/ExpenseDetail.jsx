@@ -5,6 +5,7 @@ import Header from '../components/Header';
 import TitleBar from '../components/TitleBar';
 import { colors } from '../styles/colors';
 import { getCurrentUser } from '../utils/auth';
+import { apiFetch } from '../utils/api';
 
 const Page = styled.div`
   display: flex;
@@ -168,8 +169,8 @@ function ExpenseDetail() {
 
     async function fetchExpense() {
       const [groupResponse, expenseResponse] = await Promise.all([
-        fetch(`/api/groups/${groupId}`),
-        fetch(`/api/groups/${groupId}/expenses/${expenseId}`),
+        apiFetch(`/api/groups/${groupId}`),
+        apiFetch(`/api/groups/${groupId}/expenses/${expenseId}`),
       ]);
       const groupResult = await groupResponse.json();
       const result = await expenseResponse.json();
@@ -198,8 +199,6 @@ function ExpenseDetail() {
     Boolean(expense?.payer) &&
     expense.payer.participantId === myParticipant?.participantId;
   const isOwner = myParticipant?.role === 'OWNER';
-  // payer가 null이면 결제자가 모임을 탈퇴해 참여자 목록에서 빠졌다는 뜻 —
-  // 이 경우에만 owner가 대신 삭제할 수 있다.
   const payerWithdrawn = Boolean(expense) && !expense.payer;
   const canDelete = isPayer || (isOwner && payerWithdrawn);
 
@@ -210,7 +209,7 @@ function ExpenseDetail() {
     setError('');
 
     try {
-      const response = await fetch(
+      const response = await apiFetch(
         `/api/groups/${groupId}/expenses/${expenseId}`,
         { method: 'DELETE' },
       );
