@@ -5,6 +5,7 @@ import Header from '../components/Header';
 import TitleBar from '../components/TitleBar';
 import { colors } from '../styles/colors';
 import { Input, SubmitButton, ErrorText } from '../styles/authForm';
+import { apiFetch } from '../utils/api';
 
 const Page = styled.div`
   display: flex;
@@ -301,7 +302,7 @@ function GroupSettings() {
     setError('');
 
     try {
-      const response = await fetch(
+      const response = await apiFetch(
         `/api/groups/${groupId}/participants/${userId}`,
         { method: 'DELETE' },
       );
@@ -332,7 +333,7 @@ function GroupSettings() {
     let ignore = false;
 
     async function fetchGroup() {
-      const response = await fetch(`/api/groups/${groupId}`);
+      const response = await apiFetch(`/api/groups/${groupId}`);
       const result = await response.json();
 
       if (!ignore && result.success) {
@@ -374,7 +375,7 @@ function GroupSettings() {
     setError('');
 
     try {
-      const response = await fetch(`/api/groups/${groupId}/invite`, {
+      const response = await apiFetch(`/api/groups/${groupId}/invite`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
@@ -406,7 +407,7 @@ function GroupSettings() {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch(`/api/groups/${groupId}`, {
+      const response = await apiFetch(`/api/groups/${groupId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, description }),
@@ -437,7 +438,7 @@ function GroupSettings() {
     setError('');
 
     try {
-      const response = await fetch(`/api/groups/${groupId}`, {
+      const response = await apiFetch(`/api/groups/${groupId}`, {
         method: 'DELETE',
       });
       const result = await response.json();

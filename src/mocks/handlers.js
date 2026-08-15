@@ -7,7 +7,6 @@ const meUser = {
   createdAt: '2026-07-21T14:00:00Z',
 };
 
-// userId로 참여자를 추가할 때 이름을 찾기 위한 mock 사용자 디렉터리
 const mockUsers = {
   1: meUser.name,
   2: '김철수',
@@ -19,13 +18,13 @@ const groups = [
   {
     groupId: 1,
     name: '제주도 여행',
-    description: '',
+    description: '3박 4일 제주 여행 정산',
     currency: 'KRW',
     ownerId: 1,
     createdAt: '2026-07-10T09:00:00Z',
     memberCount: 5,
     settledStatus: 'IN_PROGRESS',
-    myBalance: -35000,
+    myBalance: null,
     inviteCode: 'KJ92AL',
     inviteExpiresAt: '2026-07-13T09:00:00Z',
     members: ['주영', '수빈', '채빈', '지은', '하늘'],
@@ -228,7 +227,7 @@ const groups = [
         createdAt: '2026-08-01T15:00:00Z',
       },
     ],
-    // 정산 완료: 주영 → 채빈 3,666원, 수빈 → 채빈 6,666원 모두 COMPLETED.
+
     settlements: [
       {
         settlementId: 1,
@@ -263,8 +262,6 @@ function ensureParticipants(group) {
         participantId: group.groupId * 100 + index + 1,
         userId,
         name,
-        // OWNER 여부는 이름이 아니라 group.ownerId 기준으로 정한다 — 주영이
-        // owner가 아닌 모임(예: 망원동 빵집 투어)도 있을 수 있다.
         role: userId === group.ownerId ? 'OWNER' : 'MEMBER',
       };
     });
@@ -300,8 +297,25 @@ function forbiddenResponse(message) {
   );
 }
 
-// 참여자별 결제/부담/잔액 계산 — 단순 합산일 뿐, 정산 최적화(송금 조합 계산) 같은
-// 실제 알고리즘은 아래 optimize 핸들러에서도 구현하지 않는다.
+function requireAuth(request) {
+  const authorization = request.headers.get('Authorization');
+
+  if (!authorization?.startsWith('Bearer ')) {
+    return HttpResponse.json(
+      {
+        success: false,
+        message: '인증이 필요합니다.',
+        errors: [
+          { field: null, code: 'UNAUTHORIZED', message: '인증이 필요합니다.' },
+        ],
+      },
+      { status: 401 },
+    );
+  }
+
+  return null;
+}
+
 function computeBalances(group) {
   const participants = ensureParticipants(group);
   const expenses = group.expenses ?? [];
@@ -331,6 +345,65 @@ function computeBalances(group) {
   });
 }
 
+// 카테고리별 지출 합계 — 통계 탭의 "카테고리별 지출" 카드와 "전체 요약"의
+// byCategory에서 공용으로 쓴다.
+function computeCategoryBreakdown(group) {
+  const expenses = group.expenses ?? [];
+  const totalExpense = expenses.reduce(
+    (sum, expense) => sum + expense.amount,
+    0,
+  );
+  const byCategory = new Map();
+
+  expenses.forEach((expense) => {
+    const prev = byCategory.get(expense.category) ?? { amount: 0, count: 0 };
+    byCategory.set(expense.category, {
+      amount: prev.amount + expense.amount,
+      count: prev.count + 1,
+    });
+  });
+
+  const categories = Array.from(byCategory.entries()).map(
+    ([category, stat]) => ({
+      category,
+      amount: stat.amount,
+      ratio:
+        totalExpense > 0
+          ? Math.round((stat.amount / totalExpense) * 1000) / 10
+          : 0,
+      count: stat.count,
+    }),
+  );
+
+  return { totalExpense, categories };
+}
+
+function computeParticipantBreakdown(group) {
+  const balances = computeBalances(group);
+  const totalExpense = (group.expenses ?? []).reduce(
+    (sum, expense) => sum + expense.amount,
+    0,
+  );
+
+  return balances.map((balance) => {
+    const participant = findParticipantByParticipantId(
+      group,
+      balance.participantId,
+    );
+
+    return {
+      userId: participant?.userId ?? null,
+      name: balance.name,
+      paidAmount: balance.paidAmount,
+      burdenAmount: balance.burdenAmount,
+      paidRatio:
+        totalExpense > 0
+          ? Math.round((balance.paidAmount / totalExpense) * 1000) / 10
+          : 0,
+    };
+  });
+}
+
 function toSettlementView(group, settlement) {
   return {
     settlementId: settlement.settlementId,
@@ -347,8 +420,6 @@ function toSettlementView(group, settlement) {
   };
 }
 
-// shares[].amount는 클라이언트가 이미 계산해서 보내는 값이며(균등분배든 직접
-// 입력이든), 서버는 Σ(shares.amount) === amount인지만 검증한다.
 function validateShareSum(shares, amount) {
   const sum = shares.reduce((sum2, s) => sum2 + (Number(s.amount) || 0), 0);
   return sum === amount;
@@ -437,7 +508,7 @@ export const handlers = [
         errors: [
           {
             field: 'password',
-            code: 'INVALID_CREDENTIALS',
+            code: 'LOGIN_FAILED',
             message: '이메일 또는 비밀번호가 올바르지 않습니다.',
           },
         ],
@@ -450,6 +521,9 @@ export const handlers = [
     const { refreshToken } = await request.json();
 
     await delay(200);
+
+    const authError = requireAuth(request);
+    if (authError) return authError;
 
     if (!refreshToken) {
       return HttpResponse.json(
@@ -476,6 +550,9 @@ export const handlers = [
 
   http.get('/api/groups', async ({ request }) => {
     await delay(300);
+
+    const authError = requireAuth(request);
+    if (authError) return authError;
 
     const url = new URL(request.url);
     const page = Number(url.searchParams.get('page') ?? 0);
@@ -514,6 +591,9 @@ export const handlers = [
 
     await delay(400);
 
+    const authError = requireAuth(request);
+    if (authError) return authError;
+
     if (!name || !name.trim()) {
       return HttpResponse.json(
         {
@@ -542,7 +622,6 @@ export const handlers = [
       ownerId: meUser.userId,
       memberCount: 1,
       settledStatus: 'NOT_STARTED',
-      myBalance: null,
       inviteCode: generateInviteCode(),
       inviteExpiresAt: inviteExpiresAt.toISOString(),
       members: [meUser.name],
@@ -553,8 +632,24 @@ export const handlers = [
 
     groups.unshift(newGroup);
 
+    // newGroup에는 settledStatus/members/expenses/settlements처럼 mock이
+    // 내부적으로 이 모임 상태를 들고 있으려고 넣어둔 필드도 같이 있는데,
+    // 실제 스펙엔 없는 값들이라 응답엔 스펙에 정의된 필드만 골라서 내려준다.
     return HttpResponse.json(
-      { success: true, data: newGroup },
+      {
+        success: true,
+        data: {
+          groupId: newGroup.groupId,
+          name: newGroup.name,
+          description: newGroup.description,
+          currency: newGroup.currency,
+          ownerId: newGroup.ownerId,
+          memberCount: newGroup.memberCount,
+          inviteCode: newGroup.inviteCode,
+          inviteExpiresAt: newGroup.inviteExpiresAt,
+          createdAt: newGroup.createdAt,
+        },
+      },
       { status: 201 },
     );
   }),
@@ -563,6 +658,9 @@ export const handlers = [
     const { inviteCode } = await request.json();
 
     await delay(400);
+
+    const authError = requireAuth(request);
+    if (authError) return authError;
 
     const group = groups.find((item) => item.inviteCode === inviteCode);
 
@@ -633,6 +731,9 @@ export const handlers = [
 
     await delay(300);
 
+    const authError = requireAuth(request);
+    if (authError) return authError;
+
     const group = groups.find(
       (item) => String(item.groupId) === String(params.groupId),
     );
@@ -666,8 +767,11 @@ export const handlers = [
     );
   }),
 
-  http.get('/api/groups/:groupId', async ({ params }) => {
+  http.get('/api/groups/:groupId', async ({ params, request }) => {
     await delay(200);
+
+    const authError = requireAuth(request);
+    if (authError) return authError;
 
     const group = groups.find(
       (item) => String(item.groupId) === String(params.groupId),
@@ -687,6 +791,9 @@ export const handlers = [
     const { name, description, members } = await request.json();
 
     await delay(400);
+
+    const authError = requireAuth(request);
+    if (authError) return authError;
 
     const group = groups.find(
       (item) => String(item.groupId) === String(params.groupId),
@@ -723,10 +830,6 @@ export const handlers = [
     group.name = name;
     group.description = description ?? '';
 
-    // members는 명세서의 모임 정보 수정 요청 바디엔 없지만, 참여자 관리용
-    // 별도 API가 나오기 전까지는 설정 화면의 참여자 삭제 기능을 지원하기
-    // 위해 넘어오면 계속 반영한다. (설정 화면은 삭제만 지원하므로 목록을
-    // participants에서 걸러내는 것으로 충분하다.)
     if (Array.isArray(members)) {
       group.members = members;
       const currentParticipants = ensureParticipants(group);
@@ -751,8 +854,11 @@ export const handlers = [
     });
   }),
 
-  http.delete('/api/groups/:groupId', async ({ params }) => {
+  http.delete('/api/groups/:groupId', async ({ params, request }) => {
     await delay(300);
+
+    const authError = requireAuth(request);
+    if (authError) return authError;
 
     const index = groups.findIndex(
       (item) => String(item.groupId) === String(params.groupId),
@@ -783,6 +889,9 @@ export const handlers = [
       const { userId } = await request.json();
 
       await delay(300);
+
+      const authError = requireAuth(request);
+      if (authError) return authError;
 
       const group = groups.find(
         (item) => String(item.groupId) === String(params.groupId),
@@ -857,8 +966,11 @@ export const handlers = [
     },
   ),
 
-  http.get('/api/groups/:groupId/participants', async ({ params }) => {
+  http.get('/api/groups/:groupId/participants', async ({ params, request }) => {
     await delay(200);
+
+    const authError = requireAuth(request);
+    if (authError) return authError;
 
     const group = groups.find(
       (item) => String(item.groupId) === String(params.groupId),
@@ -879,8 +991,11 @@ export const handlers = [
 
   http.delete(
     '/api/groups/:groupId/participants/:userId',
-    async ({ params }) => {
+    async ({ params, request }) => {
       await delay(300);
+
+      const authError = requireAuth(request);
+      if (authError) return authError;
 
       const group = groups.find(
         (item) => String(item.groupId) === String(params.groupId),
@@ -947,8 +1062,11 @@ export const handlers = [
 
   http.get(
     '/api/groups/:groupId/participants/:userId/status',
-    async ({ params }) => {
+    async ({ params, request }) => {
       await delay(200);
+
+      const authError = requireAuth(request);
+      if (authError) return authError;
 
       const group = groups.find(
         (item) => String(item.groupId) === String(params.groupId),
@@ -1027,8 +1145,11 @@ export const handlers = [
     },
   ),
 
-  http.post('/api/groups/:groupId/settle', async ({ params }) => {
+  http.post('/api/groups/:groupId/settle', async ({ params, request }) => {
     await delay(300);
+
+    const authError = requireAuth(request);
+    if (authError) return authError;
 
     const group = groups.find(
       (item) => String(item.groupId) === String(params.groupId),
@@ -1043,6 +1164,7 @@ export const handlers = [
 
     // 이미 모든 정산이 COMPLETED면 다시 눌러도 DONE을 유지하고, 아니면
     // IN_PROGRESS로 표시한다 — 무조건 IN_PROGRESS로 덮어쓰지 않는다.
+
     const settlements = group.settlements ?? [];
     const allCompleted =
       settlements.length > 0 &&
@@ -1052,8 +1174,11 @@ export const handlers = [
     return HttpResponse.json({ success: true, data: group });
   }),
 
-  http.get('/api/groups/:groupId/balances', async ({ params }) => {
+  http.get('/api/groups/:groupId/balances', async ({ params, request }) => {
     await delay(200);
+
+    const authError = requireAuth(request);
+    if (authError) return authError;
 
     const group = groups.find(
       (item) => String(item.groupId) === String(params.groupId),
@@ -1078,8 +1203,12 @@ export const handlers = [
     });
   }),
 
-  http.post('/api/groups/:groupId/settlements/optimize', async ({ params }) => {
-    await delay(400);
+  // 모임 상세 "통계" 탭 - 전체 요약.
+  http.get('/api/groups/:groupId/statistics', async ({ params, request }) => {
+    await delay(200);
+
+    const authError = requireAuth(request);
+    if (authError) return authError;
 
     const group = groups.find(
       (item) => String(item.groupId) === String(params.groupId),
@@ -1092,24 +1221,125 @@ export const handlers = [
       );
     }
 
-    // 실제 송금 조합 최적화 알고리즘은 구현하지 않고, 미리 준비된
-    // group.settlements 픽스처를 그대로 "최적화 결과"로 내려준다.
-    const settlements = (group.settlements ?? []).map((s) =>
-      toSettlementView(group, s),
-    );
+    const { totalExpense, categories } = computeCategoryBreakdown(group);
+    const byParticipant = computeParticipantBreakdown(group);
 
     return HttpResponse.json({
       success: true,
       data: {
-        settlements,
-        transactionCount: settlements.length,
-        optimizedAt: new Date().toISOString(),
+        totalExpense,
+        expenseCount: (group.expenses ?? []).length,
+        byCategory: categories.map(({ category, amount, ratio }) => ({
+          category,
+          amount,
+          ratio,
+        })),
+        byParticipant: byParticipant.map(
+          ({ userId, name, paidAmount, burdenAmount }) => ({
+            userId,
+            name,
+            paidAmount,
+            burdenAmount,
+          }),
+        ),
       },
     });
   }),
 
+  // 모임 상세 "통계" 탭 - 카테고리별 지출
+  http.get(
+    '/api/groups/:groupId/statistics/categories',
+    async ({ params, request }) => {
+      await delay(200);
+
+      const authError = requireAuth(request);
+      if (authError) return authError;
+
+      const group = groups.find(
+        (item) => String(item.groupId) === String(params.groupId),
+      );
+
+      if (!group) {
+        return HttpResponse.json(
+          { success: false, message: '모임을 찾을 수 없습니다.' },
+          { status: 404 },
+        );
+      }
+
+      const { totalExpense, categories } = computeCategoryBreakdown(group);
+
+      return HttpResponse.json({
+        success: true,
+        data: { categories, totalExpense },
+      });
+    },
+  ),
+
+  // 모임 상세 "통계" 탭 - 참여자별 지출
+  http.get(
+    '/api/groups/:groupId/statistics/participants',
+    async ({ params, request }) => {
+      await delay(200);
+
+      const authError = requireAuth(request);
+      if (authError) return authError;
+
+      const group = groups.find(
+        (item) => String(item.groupId) === String(params.groupId),
+      );
+
+      if (!group) {
+        return HttpResponse.json(
+          { success: false, message: '모임을 찾을 수 없습니다.' },
+          { status: 404 },
+        );
+      }
+
+      const participants = computeParticipantBreakdown(group);
+
+      return HttpResponse.json({ success: true, data: { participants } });
+    },
+  ),
+
+  http.post(
+    '/api/groups/:groupId/settlements/optimize',
+    async ({ params, request }) => {
+      await delay(400);
+
+      const authError = requireAuth(request);
+      if (authError) return authError;
+
+      const group = groups.find(
+        (item) => String(item.groupId) === String(params.groupId),
+      );
+
+      if (!group) {
+        return HttpResponse.json(
+          { success: false, message: '모임을 찾을 수 없습니다.' },
+          { status: 404 },
+        );
+      }
+
+      const settlements = (group.settlements ?? []).map((s) =>
+        toSettlementView(group, s),
+      );
+
+      return HttpResponse.json({
+        success: true,
+        data: {
+          settlements,
+          transactionCount: settlements.length,
+          optimizedAt: new Date().toISOString(),
+        },
+      });
+    },
+  ),
+
   http.get('/api/groups/:groupId/settlements', async ({ params, request }) => {
     await delay(200);
+
+    const authError = requireAuth(request);
+    if (authError) return authError;
 
     const group = groups.find(
       (item) => String(item.groupId) === String(params.groupId),
@@ -1147,124 +1377,131 @@ export const handlers = [
     });
   }),
 
-  http.get('/api/groups/:groupId/settlements/me', async ({ params }) => {
-    await delay(200);
+  http.get(
+    '/api/groups/:groupId/settlements/me',
+    async ({ params, request }) => {
+      await delay(200);
 
-    const group = groups.find(
-      (item) => String(item.groupId) === String(params.groupId),
-    );
+      const authError = requireAuth(request);
+      if (authError) return authError;
 
-    if (!group) {
-      return HttpResponse.json(
-        { success: false, message: '모임을 찾을 수 없습니다.' },
-        { status: 404 },
+      const group = groups.find(
+        (item) => String(item.groupId) === String(params.groupId),
       );
-    }
 
-    // Authorization 헤더의 참여자 기준 — mock 환경에서는 로그인된 meUser의
-    // 이 모임 내 participantId로 고정.
-    const myParticipantId = findMyParticipant(group)?.participantId;
+      if (!group) {
+        return HttpResponse.json(
+          { success: false, message: '모임을 찾을 수 없습니다.' },
+          { status: 404 },
+        );
+      }
 
-    const toSend = (group.settlements ?? [])
-      .filter(
-        (s) =>
-          String(s.fromParticipantId) === String(myParticipantId) &&
-          s.status !== 'COMPLETED',
-      )
-      .map((s) => ({
-        settlementId: s.settlementId,
-        counterpartName:
-          findParticipantByParticipantId(group, s.toParticipantId)?.name ?? '',
-        amount: s.amount,
-        status: s.status,
-      }));
+      const myParticipantId = findMyParticipant(group)?.participantId;
 
-    const toReceive = (group.settlements ?? [])
-      .filter(
-        (s) =>
-          String(s.toParticipantId) === String(myParticipantId) &&
-          s.status !== 'COMPLETED',
-      )
-      .map((s) => ({
-        settlementId: s.settlementId,
-        counterpartName:
-          findParticipantByParticipantId(group, s.fromParticipantId)?.name ??
-          '',
-        amount: s.amount,
-        status: s.status,
-      }));
-
-    const completed = (group.settlements ?? [])
-      .filter(
-        (s) =>
-          (String(s.fromParticipantId) === String(myParticipantId) ||
-            String(s.toParticipantId) === String(myParticipantId)) &&
-          s.status === 'COMPLETED',
-      )
-      .map((s) => {
-        const isSender =
-          String(s.fromParticipantId) === String(myParticipantId);
-        const counterpartId = isSender
-          ? s.toParticipantId
-          : s.fromParticipantId;
-        return {
+      const toSend = (group.settlements ?? [])
+        .filter(
+          (s) =>
+            String(s.fromParticipantId) === String(myParticipantId) &&
+            s.status !== 'COMPLETED',
+        )
+        .map((s) => ({
           settlementId: s.settlementId,
           counterpartName:
-            findParticipantByParticipantId(group, counterpartId)?.name ?? '',
+            findParticipantByParticipantId(group, s.toParticipantId)?.name ??
+            '',
           amount: s.amount,
           status: s.status,
-        };
+        }));
+
+      const toReceive = (group.settlements ?? [])
+        .filter(
+          (s) =>
+            String(s.toParticipantId) === String(myParticipantId) &&
+            s.status !== 'COMPLETED',
+        )
+        .map((s) => ({
+          settlementId: s.settlementId,
+          counterpartName:
+            findParticipantByParticipantId(group, s.fromParticipantId)?.name ??
+            '',
+          amount: s.amount,
+          status: s.status,
+        }));
+
+      const completed = (group.settlements ?? [])
+        .filter(
+          (s) =>
+            (String(s.fromParticipantId) === String(myParticipantId) ||
+              String(s.toParticipantId) === String(myParticipantId)) &&
+            s.status === 'COMPLETED',
+        )
+        .map((s) => {
+          const isSender =
+            String(s.fromParticipantId) === String(myParticipantId);
+          const counterpartId = isSender
+            ? s.toParticipantId
+            : s.fromParticipantId;
+          return {
+            settlementId: s.settlementId,
+            counterpartName:
+              findParticipantByParticipantId(group, counterpartId)?.name ?? '',
+            amount: s.amount,
+            status: s.status,
+          };
+        });
+
+      return HttpResponse.json({
+        success: true,
+        data: { toSend, toReceive, completed },
       });
+    },
+  ),
 
-    return HttpResponse.json({
-      success: true,
-      data: { toSend, toReceive, completed },
-    });
-  }),
+  http.get(
+    '/api/groups/:groupId/settlements/summary',
+    async ({ params, request }) => {
+      await delay(200);
 
-  http.get('/api/groups/:groupId/settlements/summary', async ({ params }) => {
-    await delay(200);
+      const authError = requireAuth(request);
+      if (authError) return authError;
 
-    const group = groups.find(
-      (item) => String(item.groupId) === String(params.groupId),
-    );
-
-    if (!group) {
-      return HttpResponse.json(
-        { success: false, message: '모임을 찾을 수 없습니다.' },
-        { status: 404 },
+      const group = groups.find(
+        (item) => String(item.groupId) === String(params.groupId),
       );
-    }
 
-    const settlements = group.settlements ?? [];
-    const total = settlements.length;
-    const completed = settlements.filter(
-      (s) => s.status === 'COMPLETED',
-    ).length;
-    const pending = total - completed;
-    const allCompleted = total > 0 && pending === 0;
-    const status =
-      total === 0 ? 'NOT_STARTED' : allCompleted ? 'DONE' : 'IN_PROGRESS';
+      if (!group) {
+        return HttpResponse.json(
+          { success: false, message: '모임을 찾을 수 없습니다.' },
+          { status: 404 },
+        );
+      }
 
-    return HttpResponse.json({
-      success: true,
-      data: { total, completed, pending, allCompleted, status },
-    });
-  }),
+      const settlements = group.settlements ?? [];
+      const total = settlements.length;
+      const completed = settlements.filter(
+        (s) => s.status === 'COMPLETED',
+      ).length;
+      const pending = total - completed;
+      const allCompleted = total > 0 && pending === 0;
+      const status =
+        total === 0 ? 'NOT_STARTED' : allCompleted ? 'DONE' : 'IN_PROGRESS';
 
-  // 정산 상태는 PENDING → SENT → COMPLETED 3단계로 전이한다. 프론트는 목표
-  // status를 직접 지정하지 않고 "무슨 행동을 했는지"(action)만 보내고,
-  // 다음 상태가 뭐가 될지는 서버(mock)가 결정한다.
-  // SEND(송금 완료): PENDING → SENT, from 참여자만 — 이미 SENT/COMPLETED면 409
-  // CONFIRM(송금 확인): SENT → COMPLETED, to 참여자만 — 아직 PENDING이면 409
-  // CANCEL(송금 완료 취소): SENT → PENDING, from 참여자만 — 이미 COMPLETED면 409
-  // 권한 없는 참여자가 요청하면 403.
+      return HttpResponse.json({
+        success: true,
+        data: { total, completed, pending, allCompleted, status },
+      });
+    },
+  ),
+
   http.patch(
     '/api/groups/:groupId/settlements/:settlementId/status',
     async ({ params, request }) => {
       const { action } = await request.json();
 
       await delay(250);
+
+      const authError = requireAuth(request);
+      if (authError) return authError;
 
       const group = groups.find(
         (item) => String(item.groupId) === String(params.groupId),
@@ -1354,13 +1591,13 @@ export const handlers = [
     },
   ),
 
-  // splitMethod(EQUAL/DIRECT)는 입력 보조/검증용일 뿐 저장하지 않는다. 클라이언트가
-  // 이미 계산한 shares[].amount를 그대로 받아서 Σ(shares.amount) === amount만
-  // 검증한다. 결제자는 선택 항목이 아니라 항상 요청을 보낸 로그인 사용자로 고정된다.
   http.post('/api/groups/:groupId/expenses', async ({ params, request }) => {
     const body = await request.json();
 
     await delay(400);
+
+    const authError = requireAuth(request);
+    if (authError) return authError;
 
     const group = groups.find(
       (item) => String(item.groupId) === String(params.groupId),
@@ -1421,6 +1658,9 @@ export const handlers = [
   http.get('/api/groups/:groupId/expenses', async ({ params, request }) => {
     await delay(200);
 
+    const authError = requireAuth(request);
+    if (authError) return authError;
+
     const group = groups.find(
       (item) => String(item.groupId) === String(params.groupId),
     );
@@ -1432,9 +1672,6 @@ export const handlers = [
       );
     }
 
-    // 목록 조회(18번) 응답은 등록/상세/부담설정(17·19·22번)과 달리 participantId로
-    // 옮겨가지 않고 옛 payerId/payerName 평면 구조를 그대로 쓴다 — 실제 스펙 예시
-    // 기준. payerId 값 자체는 내부적으로 participantId를 그대로 실어 보낸다.
     const url = new URL(request.url);
     const category = url.searchParams.get('category');
     const payerId = url.searchParams.get('payerId');
@@ -1479,36 +1716,42 @@ export const handlers = [
     });
   }),
 
-  http.get('/api/groups/:groupId/expenses/:expenseId', async ({ params }) => {
-    await delay(200);
+  http.get(
+    '/api/groups/:groupId/expenses/:expenseId',
+    async ({ params, request }) => {
+      await delay(200);
 
-    const group = groups.find(
-      (item) => String(item.groupId) === String(params.groupId),
-    );
+      const authError = requireAuth(request);
+      if (authError) return authError;
 
-    if (!group) {
-      return HttpResponse.json(
-        { success: false, message: '모임을 찾을 수 없습니다.' },
-        { status: 404 },
+      const group = groups.find(
+        (item) => String(item.groupId) === String(params.groupId),
       );
-    }
 
-    const expense = group.expenses.find(
-      (item) => String(item.id) === String(params.expenseId),
-    );
+      if (!group) {
+        return HttpResponse.json(
+          { success: false, message: '모임을 찾을 수 없습니다.' },
+          { status: 404 },
+        );
+      }
 
-    if (!expense) {
-      return HttpResponse.json(
-        { success: false, message: '지출 내역을 찾을 수 없습니다.' },
-        { status: 404 },
+      const expense = group.expenses.find(
+        (item) => String(item.id) === String(params.expenseId),
       );
-    }
 
-    return HttpResponse.json({
-      success: true,
-      data: toExpenseView(group, expense),
-    });
-  }),
+      if (!expense) {
+        return HttpResponse.json(
+          { success: false, message: '지출 내역을 찾을 수 없습니다.' },
+          { status: 404 },
+        );
+      }
+
+      return HttpResponse.json({
+        success: true,
+        data: toExpenseView(group, expense),
+      });
+    },
+  ),
 
   http.put(
     '/api/groups/:groupId/expenses/:expenseId',
@@ -1516,6 +1759,9 @@ export const handlers = [
       const body = await request.json();
 
       await delay(400);
+
+      const authError = requireAuth(request);
+      if (authError) return authError;
 
       const group = groups.find(
         (item) => String(item.groupId) === String(params.groupId),
@@ -1584,8 +1830,11 @@ export const handlers = [
 
   http.delete(
     '/api/groups/:groupId/expenses/:expenseId',
-    async ({ params }) => {
+    async ({ params, request }) => {
       await delay(300);
+
+      const authError = requireAuth(request);
+      if (authError) return authError;
 
       const group = groups.find(
         (item) => String(item.groupId) === String(params.groupId),
@@ -1609,8 +1858,6 @@ export const handlers = [
         );
       }
 
-      // 결제자 본인만 삭제 가능. 단, 결제자가 이미 모임을 탈퇴해 참여자 목록에
-      // 없는 경우엔 모임장이 대신 삭제할 수 있다(권장 사항).
       const myParticipantId = findMyParticipant(group)?.participantId;
       const isPayer =
         String(expense.payerParticipantId) === String(myParticipantId);
@@ -1635,13 +1882,15 @@ export const handlers = [
     },
   ),
 
-  // 정산 부담자 N명은 shares 행 수로 파생되며 별도로 저장하지 않는다.
   http.put(
     '/api/groups/:groupId/expenses/:expenseId/shares',
     async ({ params, request }) => {
       const body = await request.json();
 
       await delay(300);
+
+      const authError = requireAuth(request);
+      if (authError) return authError;
 
       const group = groups.find(
         (item) => String(item.groupId) === String(params.groupId),
@@ -1696,7 +1945,7 @@ export const handlers = [
     },
   ),
 
-  http.post('/api/signup', async ({ request }) => {
+  http.post('/api/auth/signup', async ({ request }) => {
     const { name, email, password } = await request.json();
 
     await delay(400);
@@ -1781,23 +2030,20 @@ export const handlers = [
     );
   }),
 
-  http.get('/api/me', async () => {
+  http.get('/api/auth/me', async ({ request }) => {
     await delay(200);
+
+    const authError = requireAuth(request);
+    if (authError) return authError;
 
     return HttpResponse.json({ success: true, data: meUser });
   }),
 
-  http.patch('/api/me', async ({ request }) => {
-    const authorization = request.headers.get('Authorization');
-
+  http.patch('/api/auth/me', async ({ request }) => {
     await delay(300);
 
-    if (!authorization?.startsWith('Bearer ')) {
-      return HttpResponse.json(
-        { success: false, message: '인증이 필요합니다.' },
-        { status: 401 },
-      );
-    }
+    const authError = requireAuth(request);
+    if (authError) return authError;
 
     const { name } = await request.json();
 

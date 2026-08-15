@@ -4,6 +4,7 @@ import styled from '@emotion/styled';
 import Header from '../components/Header';
 import TitleBar from '../components/TitleBar';
 import { colors } from '../styles/colors';
+import { apiFetch } from '../utils/api';
 
 const Page = styled.div`
   display: flex;
@@ -164,7 +165,7 @@ function MySettlement() {
     let ignore = false;
 
     async function fetchSettlements() {
-      const response = await fetch(`/api/groups/${groupId}/settlements/me`);
+      const response = await apiFetch(`/api/groups/${groupId}/settlements/me`);
       const result = await response.json();
 
       if (!ignore && result.success) {
@@ -180,7 +181,7 @@ function MySettlement() {
   }, [groupId]);
 
   async function updateStatus(settlementId, action) {
-    const response = await fetch(
+    const response = await apiFetch(
       `/api/groups/${groupId}/settlements/${settlementId}/status`,
       {
         method: 'PATCH',
@@ -193,7 +194,7 @@ function MySettlement() {
     if (result.success) {
       // SEND/CONFIRM으로 상태가 바뀌면 보낼/받을/완료 목록 간 이동이 필요해서
       // 단일 항목만 patch하지 않고 /me를 다시 불러온다.
-      const refetchResponse = await fetch(
+      const refetchResponse = await apiFetch(
         `/api/groups/${groupId}/settlements/me`,
       );
       const refetchResult = await refetchResponse.json();

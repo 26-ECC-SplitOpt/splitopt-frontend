@@ -4,6 +4,7 @@ import styled from '@emotion/styled';
 import Header from '../components/Header';
 import { ChevronRightIcon } from '../components/icons';
 import { colors } from '../styles/colors';
+import { apiFetch } from '../utils/api';
 
 const STATUS_META = {
   NOT_STARTED: {
@@ -165,7 +166,7 @@ function GroupList() {
 
     async function fetchGroups() {
       try {
-        const response = await fetch('/api/groups');
+        const response = await apiFetch('/api/groups');
         const result = await response.json();
 
         if (!ignore && result.success) {

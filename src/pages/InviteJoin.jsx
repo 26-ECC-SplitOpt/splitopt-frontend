@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from '@emotion/styled';
 import Header from '../components/Header';
+import TitleBar from '../components/TitleBar';
 import { colors } from '../styles/colors';
+import { apiFetch } from '../utils/api';
 
 const Page = styled.div`
   display: flex;
@@ -21,7 +23,7 @@ const Content = styled.main`
   width: 100%;
   max-width: 342px;
   margin: 0 auto;
-  padding: 185px 24px 40px;
+  padding: 47px 24px 40px;
   box-sizing: border-box;
 `;
 
@@ -129,7 +131,7 @@ function InviteJoin() {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch('/api/groups/join', {
+      const response = await apiFetch('/api/groups/join', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ inviteCode: code.trim() }),
@@ -154,6 +156,12 @@ function InviteJoin() {
       <Header />
 
       <Content>
+        <TitleBar
+          title="초대 코드 입력"
+          onBack={() => navigate(-1)}
+          style={{ marginBottom: '52px' }}
+        />
+
         <Card>
           <CardTitle>초대 코드를 입력하세요</CardTitle>
 
@@ -163,7 +171,6 @@ function InviteJoin() {
                 value={code}
                 onChange={(event) => setCode(event.target.value)}
                 hasError={Boolean(error)}
-                placeholder="코드를 입력하세요"
               />
               <JoinButton type="submit" disabled={isSubmitting}>
                 입장
