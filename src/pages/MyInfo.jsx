@@ -36,6 +36,16 @@ const SectionLabel = styled.p`
   color: ${colors.label};
 `;
 
+const LoadingMessage = styled.p`
+  margin: 0;
+  padding: 24px 0;
+  font-family: 'Inter', sans-serif;
+  font-weight: 500;
+  font-size: 12px;
+  text-align: center;
+  color: ${colors.label};
+`;
+
 const Card = styled.div`
   display: flex;
   flex-direction: column;
@@ -215,17 +225,21 @@ function MyInfo() {
   const [nameInput, setNameInput] = useState('');
   const [nameError, setNameError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const nameInputRef = useRef(null);
 
   useEffect(() => {
     let ignore = false;
 
     async function fetchMe() {
-      const response = await apiFetch('/api/me');
+      const response = await apiFetch(
+        `${import.meta.env.VITE_API_BASE_URL}/api/auth/me`,
+      );
       const result = await response.json();
 
-      if (!ignore && result.success) {
-        setUser(result.data);
+      if (!ignore) {
+        if (result.success) setUser(result.data);
+        setIsLoading(false);
       }
     }
 
@@ -238,7 +252,7 @@ function MyInfo() {
 
   const handleLogout = async () => {
     try {
-      await apiFetch('/api/auth/logout', {
+      await apiFetch(`${import.meta.env.VITE_API_BASE_URL}/api/auth/logout`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refreshToken: getRefreshToken() }),
@@ -265,11 +279,14 @@ function MyInfo() {
     setNameError('');
 
     try {
-      const response = await apiFetch('/api/me', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: nameInput }),
-      });
+      const response = await apiFetch(
+        `${import.meta.env.VITE_API_BASE_URL}/api/auth/me`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: nameInput }),
+        },
+      );
       const result = await response.json();
 
       if (!response.ok || !result.success) {
@@ -301,56 +318,62 @@ function MyInfo() {
 
         <SectionLabel>내 계정</SectionLabel>
 
-        <Card>
-          <Row>
-            <RowLabel>이름</RowLabel>
-            {isEditingName ? (
-              <RowRight>
-                <NameInput
-                  ref={nameInputRef}
-                  value={nameInput}
-                  onChange={(event) => setNameInput(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') handleSaveName();
-                  }}
-                  maxLength={50}
-                />
-                <IconButton
-                  type="button"
-                  aria-label="이름 저장"
-                  onClick={handleSaveName}
-                  disabled={isSaving}
-                >
-                  <CheckIcon />
-                </IconButton>
-              </RowRight>
-            ) : (
-              <RowRight>
-                <RowValue>{user?.name ?? ''}</RowValue>
-                <IconButton
-                  type="button"
-                  aria-label="이름 수정"
-                  onClick={startEditingName}
-                >
-                  <EditIcon />
-                </IconButton>
-              </RowRight>
-            )}
-          </Row>
-          <Row>
-            <RowLabel>이메일</RowLabel>
-            <RowLink href={`mailto:${user?.email ?? ''}`}>
-              {user?.email ?? ''}
-            </RowLink>
-          </Row>
-          <Row isLast>
-            <LogoutButton type="button" onClick={handleLogout}>
-              <RowLabel>로그아웃</RowLabel>
-              <LogoutIcon />
-            </LogoutButton>
-          </Row>
-        </Card>
-        {nameError && <NameError>{nameError}</NameError>}
+        {isLoading ? (
+          <LoadingMessage>불러오는 중...</LoadingMessage>
+        ) : (
+          <>
+            <Card>
+              <Row>
+                <RowLabel>이름</RowLabel>
+                {isEditingName ? (
+                  <RowRight>
+                    <NameInput
+                      ref={nameInputRef}
+                      value={nameInput}
+                      onChange={(event) => setNameInput(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') handleSaveName();
+                      }}
+                      maxLength={50}
+                    />
+                    <IconButton
+                      type="button"
+                      aria-label="이름 저장"
+                      onClick={handleSaveName}
+                      disabled={isSaving}
+                    >
+                      <CheckIcon />
+                    </IconButton>
+                  </RowRight>
+                ) : (
+                  <RowRight>
+                    <RowValue>{user?.name ?? ''}</RowValue>
+                    <IconButton
+                      type="button"
+                      aria-label="이름 수정"
+                      onClick={startEditingName}
+                    >
+                      <EditIcon />
+                    </IconButton>
+                  </RowRight>
+                )}
+              </Row>
+              <Row>
+                <RowLabel>이메일</RowLabel>
+                <RowLink href={`mailto:${user?.email ?? ''}`}>
+                  {user?.email ?? ''}
+                </RowLink>
+              </Row>
+              <Row isLast>
+                <LogoutButton type="button" onClick={handleLogout}>
+                  <RowLabel>로그아웃</RowLabel>
+                  <LogoutIcon />
+                </LogoutButton>
+              </Row>
+            </Card>
+            {nameError && <NameError>{nameError}</NameError>}
+          </>
+        )}
       </Content>
     </Page>
   );
