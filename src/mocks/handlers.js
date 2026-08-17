@@ -2,7 +2,7 @@ import { http, HttpResponse, delay } from 'msw';
 
 const meUser = {
   userId: 1,
-  email: 'user@example.com',
+  email: 'user@e.com',
   name: '주영',
   createdAt: '2026-07-21T14:00:00Z',
 };
@@ -13,6 +13,16 @@ const mockUsers = {
   3: '이영희',
   4: '박민수',
 };
+
+// 로그인/회원가입용 계정 저장소. meUser(userId 1)는 그룹/지출 mock 데이터가
+// 전부 참조하는 고정 유저라서, 미리 시드해두고 로그인 시 그대로 반환한다.
+const mockCredentials = [
+  { userId: meUser.userId, email: meUser.email, password: 'pass1111' },
+];
+
+function generateToken(prefix) {
+  return `${prefix}-${Math.random().toString(36).slice(2)}`;
+}
 
 const groups = [
   {
@@ -54,6 +64,7 @@ const groups = [
         payerParticipantId: 201,
         amount: 52000,
         memo: '',
+        scheduleId: 3,
         shares: [
           { participantId: 201, amount: 13000 },
           { participantId: 202, amount: 13000 },
@@ -70,6 +81,7 @@ const groups = [
         payerParticipantId: 202,
         amount: 30000,
         memo: '',
+        scheduleId: 3,
         shares: [
           { participantId: 201, amount: 7500 },
           { participantId: 202, amount: 7500 },
@@ -86,6 +98,7 @@ const groups = [
         payerParticipantId: 201,
         amount: 75000,
         memo: '',
+        scheduleId: null,
         shares: [
           { participantId: 201, amount: 18750 },
           { participantId: 202, amount: 18750 },
@@ -102,6 +115,7 @@ const groups = [
         payerParticipantId: 203,
         amount: 80000,
         memo: '',
+        scheduleId: null,
         shares: [
           { participantId: 201, amount: 20000 },
           { participantId: 202, amount: 20000 },
@@ -118,6 +132,7 @@ const groups = [
         payerParticipantId: 204,
         amount: 41000,
         memo: '',
+        scheduleId: null,
         shares: [
           { participantId: 204, amount: 18000 },
           { participantId: 202, amount: 13000 },
@@ -147,6 +162,40 @@ const groups = [
         toParticipantId: 201,
         amount: 18000,
         status: 'PENDING',
+      },
+    ],
+    schedules: [
+      {
+        scheduleId: 1,
+        title: '여행 시작',
+        location: '',
+        startAt: '2026-08-01T09:00:00Z',
+        endAt: null,
+        memo: '',
+      },
+      {
+        scheduleId: 2,
+        title: '놀이공원',
+        location: '',
+        startAt: '2026-08-01T11:00:00Z',
+        endAt: null,
+        memo: '',
+      },
+      {
+        scheduleId: 3,
+        title: '맛집 탐방',
+        location: '',
+        startAt: '2026-08-02T12:00:00Z',
+        endAt: null,
+        memo: '',
+      },
+      {
+        scheduleId: 4,
+        title: '귀가',
+        location: '',
+        startAt: '2026-08-02T18:00:00Z',
+        endAt: null,
+        memo: '',
       },
     ],
   },
@@ -439,6 +488,7 @@ function toExpenseView(group, expense) {
     category: expense.category,
     expenseDate: expense.expenseDate,
     memo: expense.memo ?? '',
+    scheduleId: expense.scheduleId ?? null,
     payer: payer
       ? { participantId: payer.participantId, name: payer.name }
       : null,
@@ -451,6 +501,28 @@ function toExpenseView(group, expense) {
     createdAt: expense.createdAt,
     updatedAt: expense.updatedAt,
   };
+}
+
+// 특정 일정에 연결된 지출 내역과 합계를 계산한다.
+function getScheduleExpenses(group, scheduleId) {
+  const linked = (group.expenses ?? []).filter(
+    (item) => String(item.scheduleId) === String(scheduleId),
+  );
+
+  const expenses = linked.map((item) => {
+    const view = toExpenseView(group, item);
+    return {
+      expenseId: view.id,
+      title: view.title,
+      category: view.category,
+      payerName: view.payer?.name ?? '',
+      amount: view.amount,
+    };
+  });
+
+  const totalExpense = expenses.reduce((sum, item) => sum + item.amount, 0);
+
+  return { expenses, totalExpense };
 }
 
 function toGroupDetail(group) {
@@ -479,75 +551,7 @@ function toGroupDetail(group) {
 }
 
 export const handlers = [
-  http.post('/api/login', async ({ request }) => {
-    const { email, password } = await request.json();
-
-    await delay(400);
-
-    if (email === 'user@example.com' && password === 'pass1234') {
-      return HttpResponse.json({
-        success: true,
-        data: {
-          accessToken: 'eyJhbGciOiJIUzI1NiJ9.mock-access-token',
-          refreshToken: 'eyJhbGciOiJIUzI1NiJ9.mock-refresh-token',
-          tokenType: 'Bearer',
-          expiresIn: 3600,
-          user: {
-            userId: 1,
-            email,
-            name: '주영',
-          },
-        },
-      });
-    }
-
-    return HttpResponse.json(
-      {
-        success: false,
-        message: '입력값을 확인해주세요.',
-        errors: [
-          {
-            field: 'password',
-            code: 'LOGIN_FAILED',
-            message: '이메일 또는 비밀번호가 올바르지 않습니다.',
-          },
-        ],
-      },
-      { status: 401 },
-    );
-  }),
-
-  http.post('/api/auth/logout', async ({ request }) => {
-    const { refreshToken } = await request.json();
-
-    await delay(200);
-
-    const authError = requireAuth(request);
-    if (authError) return authError;
-
-    if (!refreshToken) {
-      return HttpResponse.json(
-        {
-          success: false,
-          message: '입력값을 확인해주세요.',
-          errors: [
-            {
-              field: 'refreshToken',
-              code: 'REFRESH_TOKEN_REQUIRED',
-              message: 'refreshToken이 필요합니다.',
-            },
-          ],
-        },
-        { status: 400 },
-      );
-    }
-
-    return HttpResponse.json({
-      success: true,
-      data: { message: '로그아웃 되었습니다.' },
-    });
-  }),
-
+  /* 모임 목록
   http.get('/api/groups', async ({ request }) => {
     await delay(300);
 
@@ -586,6 +590,8 @@ export const handlers = [
     });
   }),
 
+  */
+  /* 모임 생성
   http.post('/api/groups', async ({ request }) => {
     const { name, description, currency } = await request.json();
 
@@ -632,9 +638,6 @@ export const handlers = [
 
     groups.unshift(newGroup);
 
-    // newGroup에는 settledStatus/members/expenses/settlements처럼 mock이
-    // 내부적으로 이 모임 상태를 들고 있으려고 넣어둔 필드도 같이 있는데,
-    // 실제 스펙엔 없는 값들이라 응답엔 스펙에 정의된 필드만 골라서 내려준다.
     return HttpResponse.json(
       {
         success: true,
@@ -653,7 +656,8 @@ export const handlers = [
       { status: 201 },
     );
   }),
-
+  */
+  /* 모임 참여
   http.post('/api/groups/join', async ({ request }) => {
     const { inviteCode } = await request.json();
 
@@ -724,8 +728,9 @@ export const handlers = [
       },
     });
   }),
-
-  http.post('/api/groups/:groupId/invite', async ({ params, request }) => {
+  */
+  /* 모임 초대
+    http.post('/api/groups/:groupId/invite', async ({ params, request }) => {
     const body = await request.json().catch(() => ({}));
     const expiresInHours = body?.expiresInHours ?? 72;
 
@@ -766,8 +771,10 @@ export const handlers = [
       { status: 201 },
     );
   }),
-
-  http.get('/api/groups/:groupId', async ({ params, request }) => {
+  */
+  // 모임 상세 + 수정 + 삭제
+  /*
+    http.get('/api/groups/:groupId', async ({ params, request }) => {
     await delay(200);
 
     const authError = requireAuth(request);
@@ -787,7 +794,7 @@ export const handlers = [
     return HttpResponse.json({ success: true, data: toGroupDetail(group) });
   }),
 
-  http.patch('/api/groups/:groupId', async ({ params, request }) => {
+  http.put('/api/groups/:groupId', async ({ params, request }) => {
     const { name, description, members } = await request.json();
 
     await delay(400);
@@ -882,7 +889,9 @@ export const handlers = [
       data: { message: '모임이 삭제되었습니다.' },
     });
   }),
-
+  */
+  // 참여자 관리
+  /* 
   http.post(
     '/api/groups/:groupId/participants',
     async ({ params, request }) => {
@@ -1060,6 +1069,8 @@ export const handlers = [
     },
   ),
 
+  */
+  /* 참여자별 정산 현황 조회
   http.get(
     '/api/groups/:groupId/participants/:userId/status',
     async ({ params, request }) => {
@@ -1144,7 +1155,8 @@ export const handlers = [
       });
     },
   ),
-
+  */
+  /* 정산 최적화 - api 주소 잘못돼있어서 페이지에서는 바꿈 참고 
   http.post('/api/groups/:groupId/settle', async ({ params, request }) => {
     await delay(300);
 
@@ -1174,6 +1186,8 @@ export const handlers = [
     return HttpResponse.json({ success: true, data: group });
   }),
 
+  */
+  /*
   http.get('/api/groups/:groupId/balances', async ({ params, request }) => {
     await delay(200);
 
@@ -1202,8 +1216,9 @@ export const handlers = [
       data: { balances, totalExpense },
     });
   }),
-
+  */
   // 모임 상세 "통계" 탭 - 전체 요약.
+  /*
   http.get('/api/groups/:groupId/statistics', async ({ params, request }) => {
     await delay(200);
 
@@ -1245,8 +1260,9 @@ export const handlers = [
       },
     });
   }),
-
+  */
   // 모임 상세 "통계" 탭 - 카테고리별 지출
+  /*
   http.get(
     '/api/groups/:groupId/statistics/categories',
     async ({ params, request }) => {
@@ -1274,8 +1290,9 @@ export const handlers = [
       });
     },
   ),
-
+  */
   // 모임 상세 "통계" 탭 - 참여자별 지출
+  /*
   http.get(
     '/api/groups/:groupId/statistics/participants',
     async ({ params, request }) => {
@@ -1300,7 +1317,8 @@ export const handlers = [
       return HttpResponse.json({ success: true, data: { participants } });
     },
   ),
-
+  */
+  /*
   http.post(
     '/api/groups/:groupId/settlements/optimize',
     async ({ params, request }) => {
@@ -1334,7 +1352,8 @@ export const handlers = [
       });
     },
   ),
-
+  */
+  /*
   http.get('/api/groups/:groupId/settlements', async ({ params, request }) => {
     await delay(200);
 
@@ -1376,6 +1395,8 @@ export const handlers = [
       },
     });
   }),
+  */
+  /*
 
   http.get(
     '/api/groups/:groupId/settlements/me',
@@ -1456,43 +1477,8 @@ export const handlers = [
       });
     },
   ),
-
-  http.get(
-    '/api/groups/:groupId/settlements/summary',
-    async ({ params, request }) => {
-      await delay(200);
-
-      const authError = requireAuth(request);
-      if (authError) return authError;
-
-      const group = groups.find(
-        (item) => String(item.groupId) === String(params.groupId),
-      );
-
-      if (!group) {
-        return HttpResponse.json(
-          { success: false, message: '모임을 찾을 수 없습니다.' },
-          { status: 404 },
-        );
-      }
-
-      const settlements = group.settlements ?? [];
-      const total = settlements.length;
-      const completed = settlements.filter(
-        (s) => s.status === 'COMPLETED',
-      ).length;
-      const pending = total - completed;
-      const allCompleted = total > 0 && pending === 0;
-      const status =
-        total === 0 ? 'NOT_STARTED' : allCompleted ? 'DONE' : 'IN_PROGRESS';
-
-      return HttpResponse.json({
-        success: true,
-        data: { total, completed, pending, allCompleted, status },
-      });
-    },
-  ),
-
+  */
+  /*
   http.patch(
     '/api/groups/:groupId/settlements/:settlementId/status',
     async ({ params, request }) => {
@@ -1590,7 +1576,515 @@ export const handlers = [
       });
     },
   ),
+  */
+  /*
+    // 모임 상세 "일정" 탭 - 일정 목록. 시작일시 순 정렬.
+  http.get('/api/groups/:groupId/schedules', async ({ params, request }) => {
+    await delay(200);
 
+    const authError = requireAuth(request);
+    if (authError) return authError;
+
+    const group = groups.find(
+      (item) => String(item.groupId) === String(params.groupId),
+    );
+
+    if (!group) {
+      return HttpResponse.json(
+        { success: false, message: '모임을 찾을 수 없습니다.' },
+        { status: 404 },
+      );
+    }
+
+    const schedules = [...(group.schedules ?? [])]
+      .sort((a, b) => new Date(a.startAt) - new Date(b.startAt))
+      .map((schedule) => ({
+        ...schedule,
+        // 실제 백엔드 응답 필드명(id)에 맞춘다.
+        id: schedule.scheduleId,
+        totalExpense: getScheduleExpenses(group, schedule.scheduleId)
+          .totalExpense,
+      }));
+
+    return HttpResponse.json({ success: true, data: schedules });
+  }),
+
+  // 모임 상세 "일정" 탭 - 일정 등록. 제목/시작일시 필수, 장소/종료일시/메모 선택.
+  http.post('/api/groups/:groupId/schedules', async ({ params, request }) => {
+    const body = await request.json();
+
+    await delay(300);
+
+    const authError = requireAuth(request);
+    if (authError) return authError;
+
+    const group = groups.find(
+      (item) => String(item.groupId) === String(params.groupId),
+    );
+
+    if (!group) {
+      return HttpResponse.json(
+        { success: false, message: '모임을 찾을 수 없습니다.' },
+        { status: 404 },
+      );
+    }
+
+    if (!body.title || !body.title.trim()) {
+      return HttpResponse.json(
+        {
+          success: false,
+          message: '입력값을 확인해주세요.',
+          errors: [
+            {
+              field: 'title',
+              code: 'TITLE_REQUIRED',
+              message: '일정 이름을 입력해주세요.',
+            },
+          ],
+        },
+        { status: 400 },
+      );
+    }
+
+    if (!body.startAt) {
+      return HttpResponse.json(
+        {
+          success: false,
+          message: '입력값을 확인해주세요.',
+          errors: [
+            {
+              field: 'startAt',
+              code: 'START_AT_REQUIRED',
+              message: '시작 일시를 입력해주세요.',
+            },
+          ],
+        },
+        { status: 400 },
+      );
+    }
+
+    if (!group.schedules) group.schedules = [];
+
+    const newSchedule = {
+      scheduleId:
+        group.schedules.reduce(
+          (max, item) => Math.max(max, item.scheduleId),
+          0,
+        ) + 1,
+      title: body.title,
+      location: body.location ?? '',
+      startAt: body.startAt,
+      endAt: body.endAt ?? null,
+      memo: body.memo ?? '',
+    };
+
+    group.schedules.push(newSchedule);
+
+    return HttpResponse.json(
+      { success: true, data: newSchedule },
+      { status: 201 },
+    );
+  }),
+
+  // 일정 상세.
+  http.get(
+    '/api/groups/:groupId/schedules/:scheduleId',
+    async ({ params, request }) => {
+      await delay(200);
+
+      const authError = requireAuth(request);
+      if (authError) return authError;
+
+      const group = groups.find(
+        (item) => String(item.groupId) === String(params.groupId),
+      );
+
+      if (!group) {
+        return HttpResponse.json(
+          { success: false, message: '모임을 찾을 수 없습니다.' },
+          { status: 404 },
+        );
+      }
+
+      const schedule = (group.schedules ?? []).find(
+        (item) => String(item.scheduleId) === String(params.scheduleId),
+      );
+
+      if (!schedule) {
+        return HttpResponse.json(
+          { success: false, message: '일정을 찾을 수 없습니다.' },
+          { status: 404 },
+        );
+      }
+
+      const { expenses, totalExpense } = getScheduleExpenses(
+        group,
+        schedule.scheduleId,
+      );
+
+      return HttpResponse.json({
+        success: true,
+        data: {
+          ...schedule,
+          id: schedule.scheduleId,
+          expenses,
+          totalExpense,
+        },
+      });
+    },
+  ),
+
+  // 일정 수정. 제목/시작일시 필수, 장소/종료일시/메모 선택.
+  http.put(
+    '/api/groups/:groupId/schedules/:scheduleId',
+    async ({ params, request }) => {
+      const body = await request.json();
+
+      await delay(300);
+
+      const authError = requireAuth(request);
+      if (authError) return authError;
+
+      const group = groups.find(
+        (item) => String(item.groupId) === String(params.groupId),
+      );
+
+      if (!group) {
+        return HttpResponse.json(
+          { success: false, message: '모임을 찾을 수 없습니다.' },
+          { status: 404 },
+        );
+      }
+
+      const schedule = (group.schedules ?? []).find(
+        (item) => String(item.scheduleId) === String(params.scheduleId),
+      );
+
+      if (!schedule) {
+        return HttpResponse.json(
+          { success: false, message: '일정을 찾을 수 없습니다.' },
+          { status: 404 },
+        );
+      }
+
+      if (!body.title || !body.title.trim()) {
+        return HttpResponse.json(
+          {
+            success: false,
+            message: '입력값을 확인해주세요.',
+            errors: [
+              {
+                field: 'title',
+                code: 'TITLE_REQUIRED',
+                message: '일정 이름을 입력해주세요.',
+              },
+            ],
+          },
+          { status: 400 },
+        );
+      }
+
+      if (!body.startAt) {
+        return HttpResponse.json(
+          {
+            success: false,
+            message: '입력값을 확인해주세요.',
+            errors: [
+              {
+                field: 'startAt',
+                code: 'START_AT_REQUIRED',
+                message: '시작 일시를 입력해주세요.',
+              },
+            ],
+          },
+          { status: 400 },
+        );
+      }
+
+      schedule.title = body.title;
+      schedule.location = body.location ?? '';
+      schedule.startAt = body.startAt;
+      schedule.endAt = body.endAt ?? null;
+      schedule.memo = body.memo ?? '';
+
+      const { expenses, totalExpense } = getScheduleExpenses(
+        group,
+        schedule.scheduleId,
+      );
+
+      return HttpResponse.json({
+        success: true,
+        data: {
+          ...schedule,
+          id: schedule.scheduleId,
+          expenses,
+          totalExpense,
+        },
+      });
+    },
+  ),
+
+  // 일정 삭제. 연결돼 있던 지출의 scheduleId는 해제한다.
+  http.delete(
+    '/api/groups/:groupId/schedules/:scheduleId',
+    async ({ params, request }) => {
+      await delay(300);
+
+      const authError = requireAuth(request);
+      if (authError) return authError;
+
+      const group = groups.find(
+        (item) => String(item.groupId) === String(params.groupId),
+      );
+
+      if (!group) {
+        return HttpResponse.json(
+          { success: false, message: '모임을 찾을 수 없습니다.' },
+          { status: 404 },
+        );
+      }
+
+      const scheduleIndex = (group.schedules ?? []).findIndex(
+        (item) => String(item.scheduleId) === String(params.scheduleId),
+      );
+
+      if (scheduleIndex === -1) {
+        return HttpResponse.json(
+          { success: false, message: '일정을 찾을 수 없습니다.' },
+          { status: 404 },
+        );
+      }
+
+      const [removed] = group.schedules.splice(scheduleIndex, 1);
+
+      (group.expenses ?? []).forEach((expense) => {
+        if (String(expense.scheduleId) === String(removed.scheduleId)) {
+          expense.scheduleId = null;
+        }
+      });
+
+      return HttpResponse.json({ success: true, data: null });
+    },
+  ),
+
+  // 지출을 일정에 연결/해제한다. body: { scheduleId: number | null }
+  http.patch(
+    '/api/groups/:groupId/expenses/:expenseId/schedule',
+    async ({ params, request }) => {
+      const body = await request.json();
+
+      await delay(300);
+
+      const authError = requireAuth(request);
+      if (authError) return authError;
+
+      const group = groups.find(
+        (item) => String(item.groupId) === String(params.groupId),
+      );
+
+      if (!group) {
+        return HttpResponse.json(
+          { success: false, message: '모임을 찾을 수 없습니다.' },
+          { status: 404 },
+        );
+      }
+
+      const expense = group.expenses.find(
+        (item) => String(item.id) === String(params.expenseId),
+      );
+
+      if (!expense) {
+        return HttpResponse.json(
+          { success: false, message: '지출 내역을 찾을 수 없습니다.' },
+          { status: 404 },
+        );
+      }
+
+      expense.scheduleId = body.scheduleId ?? null;
+
+      return HttpResponse.json({
+        success: true,
+        data: toExpenseView(group, expense),
+      });
+    },
+  ),
+  */
+  /*
+  / 예산 설정/수정.
+  http.put('/api/groups/:groupId/budget', async ({ params, request }) => {
+    const body = await request.json();
+
+    await delay(300);
+
+    const authError = requireAuth(request);
+    if (authError) return authError;
+
+    const group = groups.find(
+      (item) => String(item.groupId) === String(params.groupId),
+    );
+
+    if (!group) {
+      return HttpResponse.json(
+        { success: false, message: '모임을 찾을 수 없습니다.' },
+        { status: 404 },
+      );
+    }
+
+    const memberCount = ensureParticipants(group).length || 1;
+    const amount = Number(body.amount) || 0;
+    const budgetPerPerson =
+      body.budgetType === 'PER_PERSON'
+        ? amount
+        : Math.floor(amount / memberCount);
+    const totalBudget =
+      body.budgetType === 'PER_PERSON' ? amount * memberCount : amount;
+
+    group.budget = {
+      budgetType: body.budgetType,
+      budgetPerPerson,
+      totalBudget,
+      updatedAt: new Date().toISOString(),
+    };
+
+    return HttpResponse.json({
+      success: true,
+      data: { groupId: group.groupId, ...group.budget },
+    });
+  }),
+
+  // 예산 현황 조회. 예산이 설정된 적 없으면 success:true에 값들만 null로 내려간다
+  // (일정 목록이 비어있을 때 빈 배열을 내려주는 것과 같은 방식).
+  http.get('/api/groups/:groupId/budget', async ({ params, request }) => {
+    await delay(200);
+
+    const authError = requireAuth(request);
+    if (authError) return authError;
+
+    const group = groups.find(
+      (item) => String(item.groupId) === String(params.groupId),
+    );
+
+    if (!group) {
+      return HttpResponse.json(
+        { success: false, message: '모임을 찾을 수 없습니다.' },
+        { status: 404 },
+      );
+    }
+
+    const spent = (group.expenses ?? []).reduce(
+      (sum, expense) => sum + expense.amount,
+      0,
+    );
+
+    if (!group.budget) {
+      return HttpResponse.json({
+        success: true,
+        data: {
+          budgetType: null,
+          budgetPerPerson: null,
+          totalBudget: null,
+          spent,
+          remaining: null,
+          usageRate: null,
+        },
+      });
+    }
+
+    const remaining = group.budget.totalBudget - spent;
+    const usageRate =
+      group.budget.totalBudget > 0
+        ? Math.round((spent / group.budget.totalBudget) * 1000) / 10
+        : 0;
+
+    return HttpResponse.json({
+      success: true,
+      data: { ...group.budget, spent, remaining, usageRate },
+    });
+  }),
+
+  // 예산 초과 예측/알림 조회.
+  http.get(
+    '/api/groups/:groupId/budget/forecast',
+    async ({ params, request }) => {
+      await delay(200);
+
+      const authError = requireAuth(request);
+      if (authError) return authError;
+
+      const group = groups.find(
+        (item) => String(item.groupId) === String(params.groupId),
+      );
+
+      if (!group) {
+        return HttpResponse.json(
+          { success: false, message: '모임을 찾을 수 없습니다.' },
+          { status: 404 },
+        );
+      }
+
+      const spent = (group.expenses ?? []).reduce(
+        (sum, expense) => sum + expense.amount,
+        0,
+      );
+
+      if (!group.budget) {
+        return HttpResponse.json({
+          success: true,
+          data: {
+            totalBudget: null,
+            spent,
+            elapsedDays: 0,
+            totalDays: 0,
+            dailyAverage: 0,
+            projectedTotal: 0,
+            willExceed: false,
+            projectedOverage: 0,
+          },
+        });
+      }
+
+      const schedules = group.schedules ?? [];
+      const starts = schedules.map((s) => new Date(s.startAt).getTime());
+      const ends = schedules.map((s) =>
+        new Date(s.endAt ?? s.startAt).getTime(),
+      );
+      const dayMs = 24 * 60 * 60 * 1000;
+      const totalDays =
+        starts.length > 0
+          ? Math.max(1, Math.round((Math.max(...ends) - Math.min(...starts)) / dayMs) + 1)
+          : 1;
+      const elapsedDays = Math.min(
+        totalDays,
+        Math.max(
+          1,
+          Math.round((Date.now() - new Date(group.createdAt).getTime()) / dayMs),
+        ),
+      );
+
+      const dailyAverage = elapsedDays > 0 ? Math.round(spent / elapsedDays) : spent;
+      const projectedTotal = dailyAverage * totalDays;
+      const willExceed = projectedTotal > group.budget.totalBudget;
+      const projectedOverage = willExceed
+        ? projectedTotal - group.budget.totalBudget
+        : 0;
+
+      return HttpResponse.json({
+        success: true,
+        data: {
+          totalBudget: group.budget.totalBudget,
+          spent,
+          elapsedDays,
+          totalDays,
+          dailyAverage,
+          projectedTotal,
+          willExceed,
+          projectedOverage,
+        },
+      });
+    },
+  ),
+  */
+  /* 지출 등록
   http.post('/api/groups/:groupId/expenses', async ({ params, request }) => {
     const body = await request.json();
 
@@ -1654,7 +2148,8 @@ export const handlers = [
       { status: 201 },
     );
   }),
-
+  */
+  /* 지출 목록, 상세, 수정, 삭제
   http.get('/api/groups/:groupId/expenses', async ({ params, request }) => {
     await delay(200);
 
@@ -1688,31 +2183,16 @@ export const handlers = [
       );
     }
 
-    const summaries = filtered.map((item) => {
-      const view = toExpenseView(group, item);
-      return {
-        expenseId: view.id,
-        title: view.title,
-        amount: view.amount,
-        payerId: view.payer?.participantId ?? null,
-        payerName: view.payer?.name ?? '',
-        category: view.category,
-        expenseDate: view.expenseDate,
-      };
-    });
+    // 실제 백엔드 응답 형식(data가 바로 배열, id/payer 객체/shares 포함)에
+    // 맞춘다.
+    const summaries = filtered.map((item) => toExpenseView(group, item));
 
     const start = page * size;
     const pageItems = summaries.slice(start, start + size);
 
     return HttpResponse.json({
       success: true,
-      data: {
-        expenses: pageItems,
-        page,
-        size,
-        totalElements: summaries.length,
-        totalPages: Math.ceil(summaries.length / size) || 1,
-      },
+      data: pageItems,
     });
   }),
 
@@ -1882,7 +2362,7 @@ export const handlers = [
     },
   ),
 
-  http.put(
+    http.put(
     '/api/groups/:groupId/expenses/:expenseId/shares',
     async ({ params, request }) => {
       const body = await request.json();
@@ -1944,62 +2424,32 @@ export const handlers = [
       });
     },
   ),
-
+  */
+  // 회원가입, 로그인, 로그아웃, 내 정보
+  /*
   http.post('/api/auth/signup', async ({ request }) => {
     const { name, email, password } = await request.json();
 
     await delay(400);
 
-    const missingFieldErrors = [];
-
     if (!name || !name.trim()) {
-      missingFieldErrors.push({
-        field: 'name',
-        code: 'NAME_REQUIRED',
-        message: '이름을 입력해주세요.',
-      });
-    }
-
-    if (!email || !email.trim()) {
-      missingFieldErrors.push({
-        field: 'email',
-        code: 'EMAIL_REQUIRED',
-        message: '이메일을 입력해주세요.',
-      });
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      missingFieldErrors.push({
-        field: 'email',
-        code: 'EMAIL_INVALID',
-        message: '이메일 형식이 올바르지 않습니다.',
-      });
-    }
-
-    if (!password) {
-      missingFieldErrors.push({
-        field: 'password',
-        code: 'PASSWORD_REQUIRED',
-        message: '비밀번호를 입력해주세요.',
-      });
-    } else if (password.length < 8) {
-      missingFieldErrors.push({
-        field: 'password',
-        code: 'PASSWORD_TOO_SHORT',
-        message: '비밀번호는 8자 이상이어야 합니다.',
-      });
-    }
-
-    if (missingFieldErrors.length > 0) {
       return HttpResponse.json(
         {
           success: false,
           message: '입력값을 확인해주세요.',
-          errors: missingFieldErrors,
+          errors: [
+            {
+              field: 'name',
+              code: 'NAME_REQUIRED',
+              message: '이름을 입력해주세요.',
+            },
+          ],
         },
         { status: 400 },
       );
     }
 
-    if (email === 'user@example.com') {
+    if (!email || !email.trim()) {
       return HttpResponse.json(
         {
           success: false,
@@ -2007,8 +2457,42 @@ export const handlers = [
           errors: [
             {
               field: 'email',
-              code: 'EMAIL_DUPLICATED',
-              message: '이미 사용 중인 이메일입니다.',
+              code: 'EMAIL_REQUIRED',
+              message: '이메일을 입력해주세요.',
+            },
+          ],
+        },
+        { status: 400 },
+      );
+    }
+
+    if (!password || password.length < 8) {
+      return HttpResponse.json(
+        {
+          success: false,
+          message: '입력값을 확인해주세요.',
+          errors: [
+            {
+              field: 'password',
+              code: 'PASSWORD_TOO_SHORT',
+              message: '비밀번호는 8자 이상이어야 합니다.',
+            },
+          ],
+        },
+        { status: 400 },
+      );
+    }
+
+    if (mockCredentials.some((item) => item.email === email)) {
+      return HttpResponse.json(
+        {
+          success: false,
+          message: '이미 가입된 이메일입니다.',
+          errors: [
+            {
+              field: 'email',
+              code: 'EMAIL_DUPLICATE',
+              message: '이미 가입된 이메일입니다.',
             },
           ],
         },
@@ -2016,11 +2500,14 @@ export const handlers = [
       );
     }
 
+    const userId = mockCredentials.length + 1;
+    mockCredentials.push({ userId, email, password, name });
+
     return HttpResponse.json(
       {
         success: true,
         data: {
-          userId: 2,
+          userId,
           email,
           name,
           createdAt: new Date().toISOString(),
@@ -2028,6 +2515,62 @@ export const handlers = [
       },
       { status: 201 },
     );
+  }),
+
+  http.post('/api/auth/login', async ({ request }) => {
+    const { email, password } = await request.json();
+
+    await delay(400);
+
+    const account = mockCredentials.find((item) => item.email === email);
+
+    if (!account || account.password !== password) {
+      return HttpResponse.json(
+        {
+          success: false,
+          message: '이메일 또는 비밀번호가 올바르지 않습니다.',
+          errors: [
+            {
+              field: null,
+              code: 'LOGIN_FAILED',
+              message: '이메일 또는 비밀번호가 올바르지 않습니다.',
+            },
+          ],
+        },
+        { status: 401 },
+      );
+    }
+
+    // meUser(userId 1)는 그룹/지출 mock 데이터가 전부 참조하는 계정이라,
+    // 시드 계정으로 로그인하면 항상 meUser 정보를 그대로 돌려준다.
+    const isSeedAccount = account.userId === meUser.userId;
+
+    return HttpResponse.json({
+      success: true,
+      data: {
+        accessToken: generateToken('access'),
+        refreshToken: generateToken('refresh'),
+        user: isSeedAccount
+          ? meUser
+          : {
+              userId: account.userId,
+              email: account.email,
+              name: account.name,
+            },
+      },
+    });
+  }),
+
+  http.post('/api/auth/logout', async ({ request }) => {
+    await delay(200);
+
+    const authError = requireAuth(request);
+    if (authError) return authError;
+
+    return HttpResponse.json({
+      success: true,
+      data: { message: '로그아웃되었습니다.' },
+    });
   }),
 
   http.get('/api/auth/me', async ({ request }) => {
@@ -2068,4 +2611,35 @@ export const handlers = [
 
     return HttpResponse.json({ success: true, data: meUser });
   }),
+
+  http.put('/api/auth/me', async ({ request }) => {
+    await delay(300);
+
+    const authError = requireAuth(request);
+    if (authError) return authError;
+
+    const { name } = await request.json();
+
+    if (!name || !name.trim() || name.length > 50) {
+      return HttpResponse.json(
+        {
+          success: false,
+          message: '입력값을 확인해주세요.',
+          errors: [
+            {
+              field: 'name',
+              code: 'NAME_INVALID',
+              message: '이름은 1자 이상 50자 이하로 입력해주세요.',
+            },
+          ],
+        },
+        { status: 400 },
+      );
+    }
+
+    meUser.name = name;
+
+    return HttpResponse.json({ success: true, data: meUser });
+  }),
+  */
 ];

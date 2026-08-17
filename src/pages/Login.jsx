@@ -97,24 +97,23 @@ function Login() {
     setIsSubmitting(true);
 
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/api/auth/login`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password }),
-        },
-      );
+      const response = await fetch(`/api/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
 
       const result = await response.json();
 
       if (!response.ok || !result.success) {
         setError(result.message ?? '로그인에 실패했습니다.');
         setFieldErrors(
-          (result.errors ?? []).reduce(
-            (acc, { field, message }) => ({ ...acc, [field]: message }),
-            {},
-          ),
+          (result.errors ?? [])
+            .filter((item) => item.field)
+            .reduce(
+              (acc, { field, message }) => ({ ...acc, [field]: message }),
+              {},
+            ),
         );
         return;
       }

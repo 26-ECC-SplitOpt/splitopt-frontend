@@ -4,11 +4,15 @@ import styled from '@emotion/styled';
 import { keyframes } from '@emotion/react';
 import Header from '../components/Header';
 import TitleBar from '../components/TitleBar';
+import Loading from '../components/Loading';
 import { colors } from '../styles/colors';
 import { getCurrentUser } from '../utils/auth';
 import { apiFetch } from '../utils/api';
-
-const CATEGORY_OPTIONS = ['식비', '교통', '숙박', '활동', '쇼핑', '기타'];
+import {
+  CATEGORY_OPTIONS,
+  toApiCategory,
+  toDisplayCategory,
+} from '../utils/category';
 
 const Page = styled.div`
   display: flex;
@@ -81,7 +85,7 @@ const TextInput = styled.input`
 const Select = styled.select`
   width: 100%;
   height: 40px;
-  padding: 0 14px;
+  padding: 0 40px 0 14px;
   border: 1px solid ${colors.accent};
   border-radius: 12px;
   font-family: 'DM Sans', sans-serif;
@@ -90,6 +94,13 @@ const Select = styled.select`
   outline: none;
   background-color: ${colors.white};
   box-sizing: border-box;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none'%3E%3Cpath d='M2.5 4.5L6 8L9.5 4.5' stroke='%23454B60' stroke-width='1.3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 18px center;
+  background-size: 12px;
 
   &:focus {
     border-color: ${colors.body};
@@ -370,8 +381,9 @@ function ExpenseForm() {
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [title, setTitle] = useState('');
   const [memo, setMemo] = useState('');
-  const [category, setCategory] = useState(CATEGORY_OPTIONS[0]);
+  const [category, setCategory] = useState('');
   const [amount, setAmount] = useState('');
+  const [scheduleId, setScheduleId] = useState(null);
   const [selectionMode, setSelectionMode] = useState('ALL');
   const [selectedParticipantIds, setSelectedParticipantIds] = useState([]);
   const [splitMode, setSplitMode] = useState('EQUAL');
@@ -379,6 +391,8 @@ function ExpenseForm() {
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [shakeTrigger, setShakeTrigger] = useState(0);
+  const [isGroupLoading, setIsGroupLoading] = useState(true);
+  const [isExpenseLoading, setIsExpenseLoading] = useState(isEditMode);
 
   useEffect(() => {
     let ignore = false;
@@ -387,14 +401,17 @@ function ExpenseForm() {
       const response = await apiFetch(`/api/groups/${groupId}`);
       const result = await response.json();
 
-      if (!ignore && result.success) {
-        const participantList = result.data.participants ?? [];
-        setGroupParticipants(participantList);
-        if (!isEditMode) {
-          setSelectedParticipantIds(
-            participantList.map((p) => p.participantId),
-          );
+      if (!ignore) {
+        if (result.success) {
+          const participantList = result.data.participants ?? [];
+          setGroupParticipants(participantList);
+          if (!isEditMode) {
+            setSelectedParticipantIds(
+              participantList.map((p) => p.participantId),
+            );
+          }
         }
+        setIsGroupLoading(false);
       }
     }
 
@@ -423,8 +440,9 @@ function ExpenseForm() {
         setDate(expense.expenseDate ?? '');
         setTitle(expense.title ?? '');
         setMemo(expense.memo ?? '');
-        setCategory(expense.category ?? CATEGORY_OPTIONS[0]);
+        setCategory(toDisplayCategory(expense.category ?? ''));
         setAmount(String(expense.amount ?? ''));
+        setScheduleId(expense.schedule?.id ?? null);
 
         const shareParticipantIds = (expense.shares ?? []).map(
           (share) => share.participantId,
@@ -452,6 +470,7 @@ function ExpenseForm() {
           ),
         );
       }
+      if (!ignore) setIsExpenseLoading(false);
     }
 
     fetchExpense();
@@ -535,6 +554,11 @@ function ExpenseForm() {
       return;
     }
 
+    if (!category) {
+      setError('카테고리를 선택해주세요.');
+      return;
+    }
+
     if (!amount || Number(amount) <= 0) {
       setError('금액을 올바르게 입력해주세요.');
       return;
@@ -550,9 +574,12 @@ function ExpenseForm() {
       return;
     }
 
+    // 백엔드 API 명세: 결제자(payer)는 로그인 사용자로 서버가 자동 고정하므로
+    // payerId는 보내지 않는다. EQUAL이면 shares에 participantId만 보내고
+    // (서버가 균등 분배 계산), DIRECT면 participantId + amount를 보낸다.
     const shares =
       splitMode === 'EQUAL'
-        ? equalShares
+        ? activeParticipants.map((p) => ({ participantId: p.participantId }))
         : activeParticipants.map((p) => ({
             participantId: p.participantId,
             amount: Number(manualAmounts[p.participantId]) || 0,
@@ -561,9 +588,10 @@ function ExpenseForm() {
     const payload = {
       title,
       amount: Number(amount),
-      category,
-      expenseDate: date,
+      category: toApiCategory(category),
       memo,
+      expenseDate: date,
+      scheduleId: isEditMode ? scheduleId : null,
       splitMethod: splitMode,
       shares,
     };
@@ -609,171 +637,193 @@ function ExpenseForm() {
           onBack={() => navigate(-1)}
         />
 
-        <Form onSubmit={handleSubmit}>
-          <FieldGroup>
-            <FieldLabel>지출 날짜</FieldLabel>
-            <TextInput
-              type="date"
-              value={date}
-              onChange={(event) => setDate(event.target.value)}
-              required
-            />
-          </FieldGroup>
-
-          <FieldGroup>
-            <FieldLabel>지출 항목</FieldLabel>
-            <TextInput
-              type="text"
-              placeholder="지출 항목을 입력하세요"
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              required
-            />
-          </FieldGroup>
-
-          <FieldGroup>
-            <FieldLabel>메모(선택)</FieldLabel>
-            <TextInput
-              type="text"
-              placeholder="메모를 입력하세요"
-              value={memo}
-              onChange={(event) => setMemo(event.target.value)}
-            />
-          </FieldGroup>
-
-          <FieldGroup>
-            <FieldLabel>카테고리</FieldLabel>
-            <Select
-              value={category}
-              onChange={(event) => setCategory(event.target.value)}
-            >
-              {CATEGORY_OPTIONS.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </Select>
-          </FieldGroup>
-
-          <FieldGroup>
-            <FieldLabel>금액</FieldLabel>
-            <AmountWrap>
+        {isGroupLoading || isExpenseLoading ? (
+          <Loading />
+        ) : (
+          <Form onSubmit={handleSubmit}>
+            <FieldGroup>
+              <FieldLabel>지출 날짜</FieldLabel>
               <TextInput
-                type="number"
-                min="0"
-                placeholder="0"
-                value={amount}
-                onChange={(event) => setAmount(event.target.value)}
-                style={{ paddingRight: '40px' }}
+                type="date"
+                value={date}
+                onChange={(event) => setDate(event.target.value)}
                 required
               />
-              <AmountUnit>원</AmountUnit>
-            </AmountWrap>
-          </FieldGroup>
+            </FieldGroup>
 
-          <FieldGroup>
-            <FieldLabel>정산 부담자</FieldLabel>
-            <RadioRow>
-              <RadioOption
-                type="button"
-                onClick={() => handleSelectionModeChange('ALL')}
-              >
-                {selectionMode === 'ALL' ? <FilledCircle /> : <HollowCircle />}
-                모두 ({groupParticipants.length}명)
-              </RadioOption>
-              <RadioOption
-                type="button"
-                onClick={() => handleSelectionModeChange('PARTIAL')}
-              >
-                {selectionMode === 'PARTIAL' ? (
-                  <FilledCircle />
-                ) : (
-                  <HollowCircle />
-                )}
-                일부 선택 ({selectedParticipantIds.length}명)
-              </RadioOption>
-            </RadioRow>
+            <FieldGroup>
+              <FieldLabel>지출 항목</FieldLabel>
+              <TextInput
+                type="text"
+                placeholder="지출 항목을 입력하세요"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                required
+              />
+            </FieldGroup>
 
-            <MemberGrid>
-              {groupParticipants.map((p) => (
-                <MemberOption
-                  key={p.participantId}
+            <FieldGroup>
+              <FieldLabel>메모(선택)</FieldLabel>
+              <TextInput
+                type="text"
+                placeholder="메모를 입력하세요"
+                value={memo}
+                onChange={(event) => setMemo(event.target.value)}
+              />
+            </FieldGroup>
+
+            <FieldGroup>
+              <FieldLabel>카테고리</FieldLabel>
+              <Select
+                value={category}
+                onChange={(event) => setCategory(event.target.value)}
+                required
+              >
+                <option value="" disabled hidden>
+                  카테고리를 선택하세요
+                </option>
+                {CATEGORY_OPTIONS.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </Select>
+            </FieldGroup>
+
+            <FieldGroup>
+              <FieldLabel>금액</FieldLabel>
+              <AmountWrap>
+                <TextInput
+                  type="number"
+                  min="0"
+                  placeholder="0"
+                  value={amount}
+                  onChange={(event) => setAmount(event.target.value)}
+                  style={{ paddingRight: '40px' }}
+                  required
+                />
+                <AmountUnit>원</AmountUnit>
+              </AmountWrap>
+            </FieldGroup>
+
+            <FieldGroup>
+              <FieldLabel>정산 부담자</FieldLabel>
+              <RadioRow>
+                <RadioOption
                   type="button"
-                  disabled={selectionMode === 'ALL'}
-                  onClick={() => toggleMember(p.participantId)}
+                  onClick={() => handleSelectionModeChange('ALL')}
                 >
-                  {activeParticipantIds.includes(p.participantId) ? (
+                  {selectionMode === 'ALL' ? (
                     <FilledCircle />
                   ) : (
                     <HollowCircle />
                   )}
-                  {displayName(p)}
-                </MemberOption>
-              ))}
-            </MemberGrid>
-          </FieldGroup>
-
-          <FieldGroup>
-            <FieldLabel>정산 방법</FieldLabel>
-            <RadioRow>
-              <RadioOption type="button" onClick={() => setSplitMode('EQUAL')}>
-                {splitMode === 'EQUAL' ? <FilledCircle /> : <HollowCircle />}
-                균등 분담
-              </RadioOption>
-              <RadioOption type="button" onClick={() => setSplitMode('DIRECT')}>
-                {splitMode === 'DIRECT' ? <FilledCircle /> : <HollowCircle />}
-                직접 입력
-              </RadioOption>
-            </RadioRow>
-
-            <ShareList>
-              {activeParticipants.map((p) => (
-                <ShareRow key={p.participantId}>
-                  <ShareName>{displayName(p)}</ShareName>
-                  {splitMode === 'EQUAL' ? (
-                    <EqualShareValue>
-                      {formatAmount(
-                        equalShareByParticipantId[p.participantId] ?? 0,
-                      )}
-                    </EqualShareValue>
+                  모두 ({groupParticipants.length}명)
+                </RadioOption>
+                <RadioOption
+                  type="button"
+                  onClick={() => handleSelectionModeChange('PARTIAL')}
+                >
+                  {selectionMode === 'PARTIAL' ? (
+                    <FilledCircle />
                   ) : (
-                    <ShareAmountRow>
-                      <ShareInput
-                        type="number"
-                        min="0"
-                        value={manualAmounts[p.participantId] ?? ''}
-                        onChange={(event) =>
-                          setManualAmounts((prev) => ({
-                            ...prev,
-                            [p.participantId]: event.target.value,
-                          }))
-                        }
-                      />
-                      <ShareUnit>원</ShareUnit>
-                    </ShareAmountRow>
+                    <HollowCircle />
                   )}
-                </ShareRow>
-              ))}
-            </ShareList>
+                  일부 선택 ({selectedParticipantIds.length}명)
+                </RadioOption>
+              </RadioRow>
 
-            {splitMode === 'DIRECT' && allManualFilled && (
-              <ValidationRow key={shakeTrigger} shakeTrigger={shakeTrigger}>
-                <ValidationBadge ok={isManualValid}>*</ValidationBadge>
-                <ValidationText ok={isManualValid}>
-                  {isManualValid
-                    ? '입력한 금액이 결제 금액과 일치합니다.'
-                    : '입력한 금액의 합이 결제 금액과 다릅니다.'}
-                </ValidationText>
-              </ValidationRow>
-            )}
-          </FieldGroup>
+              <MemberGrid>
+                {groupParticipants.map((p) => (
+                  <MemberOption
+                    key={p.participantId}
+                    type="button"
+                    disabled={selectionMode === 'ALL'}
+                    onClick={() => toggleMember(p.participantId)}
+                  >
+                    {activeParticipantIds.includes(p.participantId) ? (
+                      <FilledCircle />
+                    ) : (
+                      <HollowCircle />
+                    )}
+                    {displayName(p)}
+                  </MemberOption>
+                ))}
+              </MemberGrid>
+            </FieldGroup>
 
-          {error && <ErrorText>{error}</ErrorText>}
+            <FieldGroup>
+              <FieldLabel>정산 방법</FieldLabel>
+              <RadioRow>
+                <RadioOption
+                  type="button"
+                  onClick={() => setSplitMode('EQUAL')}
+                >
+                  {splitMode === 'EQUAL' ? <FilledCircle /> : <HollowCircle />}
+                  균등 분담
+                </RadioOption>
+                <RadioOption
+                  type="button"
+                  onClick={() => setSplitMode('DIRECT')}
+                >
+                  {splitMode === 'DIRECT' ? <FilledCircle /> : <HollowCircle />}
+                  직접 입력
+                </RadioOption>
+              </RadioRow>
 
-          <SubmitButton type="submit" disabled={isSubmitting}>
-            {isSubmitting ? '처리 중...' : isEditMode ? '수정하기' : '등록하기'}
-          </SubmitButton>
-        </Form>
+              <ShareList>
+                {activeParticipants.map((p) => (
+                  <ShareRow key={p.participantId}>
+                    <ShareName>{displayName(p)}</ShareName>
+                    {splitMode === 'EQUAL' ? (
+                      <EqualShareValue>
+                        {formatAmount(
+                          equalShareByParticipantId[p.participantId] ?? 0,
+                        )}
+                      </EqualShareValue>
+                    ) : (
+                      <ShareAmountRow>
+                        <ShareInput
+                          type="number"
+                          min="0"
+                          value={manualAmounts[p.participantId] ?? ''}
+                          onChange={(event) =>
+                            setManualAmounts((prev) => ({
+                              ...prev,
+                              [p.participantId]: event.target.value,
+                            }))
+                          }
+                        />
+                        <ShareUnit>원</ShareUnit>
+                      </ShareAmountRow>
+                    )}
+                  </ShareRow>
+                ))}
+              </ShareList>
+
+              {splitMode === 'DIRECT' && allManualFilled && (
+                <ValidationRow key={shakeTrigger} shakeTrigger={shakeTrigger}>
+                  <ValidationBadge ok={isManualValid}>*</ValidationBadge>
+                  <ValidationText ok={isManualValid}>
+                    {isManualValid
+                      ? '입력한 금액이 결제 금액과 일치합니다.'
+                      : '입력한 금액의 합이 결제 금액과 다릅니다.'}
+                  </ValidationText>
+                </ValidationRow>
+              )}
+            </FieldGroup>
+
+            {error && <ErrorText>{error}</ErrorText>}
+
+            <SubmitButton type="submit" disabled={isSubmitting}>
+              {isSubmitting
+                ? '처리 중...'
+                : isEditMode
+                  ? '수정하기'
+                  : '등록하기'}
+            </SubmitButton>
+          </Form>
+        )}
       </Content>
     </Page>
   );

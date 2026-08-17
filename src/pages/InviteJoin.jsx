@@ -1,48 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from '@emotion/styled';
-import Header from '../components/Header';
-import TitleBar from '../components/TitleBar';
+import Modal from '../components/Modal';
 import { colors } from '../styles/colors';
 import { apiFetch } from '../utils/api';
 
-const Page = styled.div`
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
-  width: 100%;
-  max-width: 390px;
-  margin: 0 auto;
-  background-color: ${colors.white};
-  font-family: 'Inter', sans-serif;
-`;
-
-const Content = styled.main`
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  max-width: 342px;
-  margin: 0 auto;
-  padding: 47px 24px 40px;
-  box-sizing: border-box;
-`;
-
-const Card = styled.div`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 30px;
-  min-height: 265px;
-  padding: 30px 20px;
-  background-color: #fbfbfb;
-  border: 1px solid rgba(69, 75, 96, 0.7);
-  border-radius: 31px;
-  box-sizing: border-box;
-`;
-
 const CardTitle = styled.p`
-  margin: 0;
+  margin: 0 0 24px;
   font-family: 'Inter', sans-serif;
   font-weight: 700;
   font-size: 17px;
@@ -62,7 +26,7 @@ const InputRow = styled.form`
 `;
 
 const CodeInput = styled.input`
-  width: 162px;
+  flex: 1;
   height: 34px;
   padding: 0 14px;
   border: 1px solid
@@ -113,7 +77,7 @@ const ErrorText = styled.p`
   color: ${colors.error};
 `;
 
-function InviteJoin() {
+function InviteJoin({ onClose }) {
   const navigate = useNavigate();
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
@@ -131,7 +95,7 @@ function InviteJoin() {
     setIsSubmitting(true);
 
     try {
-      const response = await apiFetch('/api/groups/join', {
+      const response = await apiFetch(`/api/groups/join`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ inviteCode: code.trim() }),
@@ -152,35 +116,24 @@ function InviteJoin() {
   };
 
   return (
-    <Page>
-      <Header />
+    <Modal onClose={onClose}>
+      <CardTitle>초대 코드를 입력하세요</CardTitle>
 
-      <Content>
-        <TitleBar
-          title="초대 코드 입력"
-          onBack={() => navigate(-1)}
-          style={{ marginBottom: '52px' }}
-        />
-
-        <Card>
-          <CardTitle>초대 코드를 입력하세요</CardTitle>
-
-          <FieldWrap>
-            <InputRow onSubmit={handleSubmit}>
-              <CodeInput
-                value={code}
-                onChange={(event) => setCode(event.target.value)}
-                hasError={Boolean(error)}
-              />
-              <JoinButton type="submit" disabled={isSubmitting}>
-                입장
-              </JoinButton>
-            </InputRow>
-            {error && <ErrorText>{error}</ErrorText>}
-          </FieldWrap>
-        </Card>
-      </Content>
-    </Page>
+      <FieldWrap>
+        <InputRow onSubmit={handleSubmit}>
+          <CodeInput
+            value={code}
+            onChange={(event) => setCode(event.target.value)}
+            hasError={Boolean(error)}
+            placeholder="코드를 입력하세요"
+          />
+          <JoinButton type="submit" disabled={isSubmitting}>
+            입장
+          </JoinButton>
+        </InputRow>
+        {error && <ErrorText>{error}</ErrorText>}
+      </FieldWrap>
+    </Modal>
   );
 }
 

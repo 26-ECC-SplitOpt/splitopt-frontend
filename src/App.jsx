@@ -2,10 +2,8 @@ import { Routes, Route } from 'react-router-dom';
 import Login from './pages/Login';
 import SignUp from './pages/SignUp';
 import GroupList from './pages/GroupList';
-import GroupCreate from './pages/GroupCreate';
 import GroupDetail from './pages/GroupDetail';
 import GroupSettings from './pages/GroupSettings';
-import InviteJoin from './pages/InviteJoin';
 import SettleResult from './pages/SettleResult';
 import MySettlement from './pages/MySettlement';
 import MyInfo from './pages/MyInfo';
@@ -21,8 +19,6 @@ function App() {
 
       <Route element={<ProtectedRoute />}>
         <Route path="/groups" element={<GroupList />} />
-        <Route path="/groups/new" element={<GroupCreate />} />
-        <Route path="/groups/join" element={<InviteJoin />} />
         <Route path="/groups/:groupId" element={<GroupDetail />} />
         <Route path="/groups/:groupId/settings" element={<GroupSettings />} />
         <Route path="/groups/:groupId/expenses/new" element={<ExpenseForm />} />

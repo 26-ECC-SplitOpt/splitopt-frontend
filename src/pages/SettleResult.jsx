@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import styled from '@emotion/styled';
 import Header from '../components/Header';
 import TitleBar from '../components/TitleBar';
+import Loading from '../components/Loading';
 import { colors } from '../styles/colors';
 import { apiFetch } from '../utils/api';
 
@@ -133,6 +134,7 @@ function SettleResult() {
   const { groupId } = useParams();
   const [settlements, setSettlements] = useState([]);
   const [groupName, setGroupName] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     let ignore = false;
@@ -150,6 +152,7 @@ function SettleResult() {
         if (settlementsResult.success) {
           setSettlements(settlementsResult.data.settlements);
         }
+        setIsLoading(false);
       }
     }
 
@@ -169,37 +172,45 @@ function SettleResult() {
       <Content>
         <TitleBar title="정산 결과 조회" onBack={() => navigate(-1)} />
 
-        <SectionTitle>
-          {groupName ? `${groupName} 정산 목록` : '정산 목록'}
-        </SectionTitle>
-
-        {hasSettlements ? (
-          <List>
-            {settlements.map((settlement) => (
-              <Row key={settlement.settlementId}>
-                <RowNames>
-                  <RowText>
-                    {settlement.fromName} → {settlement.toName}
-                  </RowText>
-                  {settlement.status === 'COMPLETED' && (
-                    <DoneBadge>정산 완료</DoneBadge>
-                  )}
-                </RowNames>
-                <RowAmount>
-                  {settlement.amount.toLocaleString('ko-KR')}원
-                </RowAmount>
-              </Row>
-            ))}
-          </List>
+        {isLoading ? (
+          <Loading />
         ) : (
-          <EmptyWrap>
-            <EmptyMessage>정산할 내역이 없습니다.</EmptyMessage>
-          </EmptyWrap>
-        )}
+          <>
+            <SectionTitle>
+              {groupName ? `${groupName} 정산 목록` : '정산 목록'}
+            </SectionTitle>
 
-        <CheckButton onClick={() => navigate(`/groups/${groupId}/settle/me`)}>
-          <CheckButtonInner>내 정산 확인하기</CheckButtonInner>
-        </CheckButton>
+            {hasSettlements ? (
+              <List>
+                {settlements.map((settlement) => (
+                  <Row key={settlement.settlementId}>
+                    <RowNames>
+                      <RowText>
+                        {settlement.fromName} → {settlement.toName}
+                      </RowText>
+                      {settlement.status === 'COMPLETED' && (
+                        <DoneBadge>정산 완료</DoneBadge>
+                      )}
+                    </RowNames>
+                    <RowAmount>
+                      {settlement.amount.toLocaleString('ko-KR')}원
+                    </RowAmount>
+                  </Row>
+                ))}
+              </List>
+            ) : (
+              <EmptyWrap>
+                <EmptyMessage>정산할 내역이 없습니다.</EmptyMessage>
+              </EmptyWrap>
+            )}
+
+            <CheckButton
+              onClick={() => navigate(`/groups/${groupId}/settle/me`)}
+            >
+              <CheckButtonInner>내 정산 확인하기</CheckButtonInner>
+            </CheckButton>
+          </>
+        )}
       </Content>
     </Page>
   );

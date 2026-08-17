@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import styled from '@emotion/styled';
 import Header from '../components/Header';
 import TitleBar from '../components/TitleBar';
+import Loading from '../components/Loading';
 import { colors } from '../styles/colors';
 import { clearSession, getRefreshToken } from '../utils/auth';
 import { apiFetch } from '../utils/api';
@@ -33,16 +34,6 @@ const SectionLabel = styled.p`
   font-family: 'Inter', sans-serif;
   font-weight: 600;
   font-size: 14px;
-  color: ${colors.label};
-`;
-
-const LoadingMessage = styled.p`
-  margin: 0;
-  padding: 24px 0;
-  font-family: 'Inter', sans-serif;
-  font-weight: 500;
-  font-size: 12px;
-  text-align: center;
   color: ${colors.label};
 `;
 
@@ -232,9 +223,7 @@ function MyInfo() {
     let ignore = false;
 
     async function fetchMe() {
-      const response = await apiFetch(
-        `${import.meta.env.VITE_API_BASE_URL}/api/auth/me`,
-      );
+      const response = await apiFetch(`/api/auth/me`);
       const result = await response.json();
 
       if (!ignore) {
@@ -252,7 +241,7 @@ function MyInfo() {
 
   const handleLogout = async () => {
     try {
-      await apiFetch(`${import.meta.env.VITE_API_BASE_URL}/api/auth/logout`, {
+      await apiFetch(`/api/auth/logout`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ refreshToken: getRefreshToken() }),
@@ -279,14 +268,11 @@ function MyInfo() {
     setNameError('');
 
     try {
-      const response = await apiFetch(
-        `${import.meta.env.VITE_API_BASE_URL}/api/auth/me`,
-        {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: nameInput }),
-        },
-      );
+      const response = await apiFetch(`/api/auth/me`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: nameInput }),
+      });
       const result = await response.json();
 
       if (!response.ok || !result.success) {
@@ -319,7 +305,7 @@ function MyInfo() {
         <SectionLabel>내 계정</SectionLabel>
 
         {isLoading ? (
-          <LoadingMessage>불러오는 중...</LoadingMessage>
+          <Loading />
         ) : (
           <>
             <Card>
