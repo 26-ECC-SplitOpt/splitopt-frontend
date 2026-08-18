@@ -205,12 +205,32 @@ function formatAmount(amount) {
   return `${amount.toLocaleString('ko-KR')}원`;
 }
 
+function UnlinkIcon() {
+  return (
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 14 14"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M2.5 2.5L11.5 11.5M11.5 2.5L2.5 11.5"
+        stroke="rgba(0, 0, 0, 0.4)"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 function ScheduleDetail({ groupId, scheduleId, onClose, onChanged }) {
   const [schedule, setSchedule] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isLinking, setIsLinking] = useState(false);
+  const [unlinkingId, setUnlinkingId] = useState(null);
   const [error, setError] = useState('');
 
   // 명세서상 일정 단건 조회는 없고, "일정별 지출 조회"(.../schedules/:scheduleId/expenses)가
@@ -287,6 +307,37 @@ function ScheduleDetail({ groupId, scheduleId, onClose, onChanged }) {
       setError('오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleUnlink = async (expenseId) => {
+    if (unlinkingId) return;
+
+    setUnlinkingId(expenseId);
+    setError('');
+
+    try {
+      const response = await apiFetch(
+        `/api/groups/${groupId}/expenses/${expenseId}/schedule`,
+        {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ scheduleId: null }),
+        },
+      );
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        setError(result.message ?? '지출 연결 해제에 실패했습니다.');
+        return;
+      }
+
+      await fetchSchedule();
+      await onChanged();
+    } catch {
+      setError('오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+    } finally {
+      setUnlinkingId(null);
     }
   };
 
@@ -383,6 +434,14 @@ function ScheduleDetail({ groupId, scheduleId, onClose, onChanged }) {
                     <ExpenseAmount>
                       {formatAmount(expense.amount)}
                     </ExpenseAmount>
+                    <IconButton
+                      type="button"
+                      aria-label="지출 연결 해제"
+                      onClick={() => handleUnlink(expense.id)}
+                      disabled={unlinkingId !== null}
+                    >
+                      <UnlinkIcon />
+                    </IconButton>
                   </ExpenseRow>
                 );
               })}

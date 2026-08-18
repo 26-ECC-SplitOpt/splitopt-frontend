@@ -746,6 +746,15 @@ function GroupDetail() {
   const hasExpenses = expenses.length > 0;
   const memberCount = (group?.participants ?? []).length;
 
+  // 일정 목록 조회 응답엔 총 지출이 안 내려와서, 이미 불러온 전체 지출 목록에서
+  // 일정별로 직접 합산한다.
+  const scheduleTotalsById = expenses.reduce((acc, expense) => {
+    const scheduleId = expense.schedule?.id;
+    if (scheduleId === undefined || scheduleId === null) return acc;
+    acc[scheduleId] = (acc[scheduleId] ?? 0) + expense.amount;
+    return acc;
+  }, {});
+
   const currentUser = getCurrentUser();
   const myParticipant = (group?.participants ?? []).find(
     (p) => p.userId === currentUser?.userId,
@@ -983,7 +992,7 @@ function GroupDetail() {
                       </ScheduleDate>
                       <ScheduleTitle>{schedule.title}</ScheduleTitle>
                       <ScheduleAmount>
-                        {formatAmount(schedule.totalExpense ?? 0)}
+                        {formatAmount(scheduleTotalsById[schedule.id] ?? 0)}
                       </ScheduleAmount>
                       <ChevronRightIcon color="rgba(29, 31, 34, 0.82)" />
                     </ScheduleRow>
@@ -1073,8 +1082,9 @@ function GroupDetail() {
 
                   {forecast.willExceed === null ? (
                     <EmptyMessage>
-                      예측할 기준 기간이 없어요. 일정을 등록하면 예산 초과
-                      예측을 확인할 수 있어요.
+                      아직 일정이 없거나, 등록된 일정이 시작 전이라 예측할 수
+                      없어요. 일정이 시작되면 지출 속도를 기준으로 예측을
+                      보여드려요.
                     </EmptyMessage>
                   ) : (
                     <>
