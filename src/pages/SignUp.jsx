@@ -11,6 +11,7 @@ import {
   ErrorText,
   FieldError,
 } from '../styles/authForm';
+import { apiFetch } from '../utils/api';
 
 const Page = styled.div`
   display: flex;
@@ -114,7 +115,7 @@ function SignUp() {
 
     try {
       const { name, email, password } = form;
-      const response = await fetch(`/api/auth/signup`, {
+      const response = await apiFetch(`/api/auth/signup`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email, password }),
