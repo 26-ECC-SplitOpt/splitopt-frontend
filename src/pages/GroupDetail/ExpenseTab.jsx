@@ -138,6 +138,10 @@ function ExpenseTab({
   onSettle,
 }) {
   const hasExpenses = expenses.length > 0;
+  // 최신 지출이 위로, 가장 오래된 지출이 아래로 가도록 지출 날짜 내림차순 정렬.
+  const sortedExpenses = expenses
+    .slice()
+    .sort((a, b) => (b.expenseDate ?? '').localeCompare(a.expenseDate ?? ''));
 
   return (
     <>
@@ -166,7 +170,7 @@ function ExpenseTab({
         </ExpenseEmptyWrap>
       ) : hasExpenses ? (
         <ExpenseList>
-          {expenses.map((expense) => {
+          {sortedExpenses.map((expense) => {
             const CategoryIcon = getCategoryIcon(expense.category);
 
             return (
