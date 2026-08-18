@@ -14,6 +14,7 @@ import { formatScheduleDate } from '../utils/scheduleDate';
 import ScheduleForm from './ScheduleForm';
 import ScheduleDetail from './ScheduleDetail';
 import BudgetForm from './BudgetForm';
+import AccessDenied from '../components/AccessDenied';
 
 const CATEGORY_COLORS = {
   식비: '#BC97DF',
@@ -552,6 +553,7 @@ function GroupDetail() {
   const [group, setGroup] = useState(null);
   const [expenses, setExpenses] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [accessError, setAccessError] = useState('');
   const [isSettling, setIsSettling] = useState(false);
   const [hasSettlements, setHasSettlements] = useState(false);
   const [activeTab, setActiveTab] = useState('expense');
@@ -590,7 +592,15 @@ function GroupDetail() {
       const settlementsResult = await settlementsResponse.json();
 
       if (!ignore) {
-        if (groupResult.success) setGroup(groupResult.data);
+        if (groupResult.success) {
+          setGroup(groupResult.data);
+        } else if (groupResponse.status === 403) {
+          setAccessError('이 모임에 접근할 권한이 없어요.');
+        } else if (groupResponse.status === 404) {
+          setAccessError('모임을 찾을 수 없어요.');
+        } else {
+          setAccessError('모임 정보를 불러오지 못했어요.');
+        }
         if (expensesResult.success) {
           setExpenses(
             (expensesResult.data ?? []).map((item) => ({
@@ -663,6 +673,34 @@ function GroupDetail() {
     };
   }, [activeTab, groupId]);
 
+  // 일정 목록 조회 응답엔 총 지출이 안 내려오고, 그룹 전체 지출 목록에도
+  // 일정 연결 정보가 안 내려오는 것 같아서, 일정별로 실제 값이 확인된
+  // "일정별 지출 조회"(.../schedules/:scheduleId/expenses)를 따로 불러와 합산한다.
+  async function attachScheduleTotals(scheduleList) {
+    const results = await Promise.all(
+      scheduleList.map((schedule) =>
+        apiFetch(
+          `/api/groups/${groupId}/schedules/${schedule.id}/expenses`,
+        ).then((res) => res.json()),
+      ),
+    );
+
+    return scheduleList.map((schedule, index) => {
+      const result = results[index];
+      const scheduleExpenses = result.success
+        ? result.data.expenses ?? []
+        : [];
+
+      return {
+        ...schedule,
+        totalExpense: scheduleExpenses.reduce(
+          (sum, expense) => sum + (expense.amount ?? 0),
+          0,
+        ),
+      };
+    });
+  }
+
   async function fetchSchedules() {
     setSchedulesLoading(true);
 
@@ -670,29 +708,9 @@ function GroupDetail() {
     const result = await response.json();
 
     if (result.success) {
-      setSchedules(result.data ?? []);
+      setSchedules(await attachScheduleTotals(result.data ?? []));
     }
     setSchedulesLoading(false);
-  }
-
-  // 지출-일정 연결/해제 시 일정 목록의 합계도 최신 상태로 보이도록 지출 목록도
-  // 같이 다시 불러온다.
-  async function fetchExpenses() {
-    const response = await apiFetch(`/api/groups/${groupId}/expenses`);
-    const result = await response.json();
-
-    if (result.success) {
-      setExpenses(
-        (result.data ?? []).map((item) => ({
-          ...item,
-          category: toDisplayCategory(item.category),
-        })),
-      );
-    }
-  }
-
-  async function refreshSchedulesAndExpenses() {
-    await Promise.all([fetchSchedules(), fetchExpenses()]);
   }
 
   useEffect(() => {
@@ -707,7 +725,7 @@ function GroupDetail() {
       const result = await response.json();
 
       if (!ignore && result.success) {
-        setSchedules(result.data ?? []);
+        setSchedules(await attachScheduleTotals(result.data ?? []));
       }
       if (!ignore) setSchedulesLoading(false);
     }
@@ -766,15 +784,6 @@ function GroupDetail() {
   const hasExpenses = expenses.length > 0;
   const memberCount = (group?.participants ?? []).length;
 
-  // 일정 목록 조회 응답엔 총 지출이 안 내려와서, 이미 불러온 전체 지출 목록에서
-  // 일정별로 직접 합산한다.
-  const scheduleTotalsById = expenses.reduce((acc, expense) => {
-    const scheduleId = expense.schedule?.id;
-    if (scheduleId === undefined || scheduleId === null) return acc;
-    acc[scheduleId] = (acc[scheduleId] ?? 0) + expense.amount;
-    return acc;
-  }, {});
-
   const currentUser = getCurrentUser();
   const myParticipant = (group?.participants ?? []).find(
     (p) => p.userId === currentUser?.userId,
@@ -806,6 +815,15 @@ function GroupDetail() {
     } finally {
       setIsSettling(false);
     }
+  }
+
+  if (!isLoading && accessError) {
+    return (
+      <Page>
+        <Header />
+        <AccessDenied message={accessError} />
+      </Page>
+    );
   }
 
   return (
@@ -892,7 +910,11 @@ function GroupDetail() {
                         <ExpenseCategory>
                           {expense.title ?? expense.category}
                         </ExpenseCategory>
-                        <ExpensePayer>{expense.payer?.name}</ExpensePayer>
+                        <ExpensePayer>
+                          {expense.payer?.name}
+                          {expense.expenseDate &&
+                            ` · ${formatScheduleDate(expense.expenseDate)}`}
+                        </ExpensePayer>
                       </ExpenseInfo>
                       <ExpenseAmount>
                         {formatAmount(expense.amount)}
@@ -1012,7 +1034,7 @@ function GroupDetail() {
                       </ScheduleDate>
                       <ScheduleTitle>{schedule.title}</ScheduleTitle>
                       <ScheduleAmount>
-                        {formatAmount(scheduleTotalsById[schedule.id] ?? 0)}
+                        {formatAmount(schedule.totalExpense ?? 0)}
                       </ScheduleAmount>
                       <ChevronRightIcon color="rgba(29, 31, 34, 0.82)" />
                     </ScheduleRow>
@@ -1108,8 +1130,16 @@ function GroupDetail() {
                     </EmptyMessage>
                   ) : (
                     <>
+                      {forecast.spentBeforePeriod > 0 && (
+                        <SummaryRow>
+                          <SummaryLabel>여행 전 지출</SummaryLabel>
+                          <SummaryValue>
+                            {formatAmount(forecast.spentBeforePeriod)}
+                          </SummaryValue>
+                        </SummaryRow>
+                      )}
                       <SummaryRow>
-                        <SummaryLabel>일 평균 지출</SummaryLabel>
+                        <SummaryLabel>일 평균 지출(여행 중)</SummaryLabel>
                         <SummaryValue>
                           {formatAmount(forecast.dailyAverage)}
                         </SummaryValue>
@@ -1149,7 +1179,7 @@ function GroupDetail() {
           groupId={groupId}
           scheduleId={selectedScheduleId}
           onClose={() => setSelectedScheduleId(null)}
-          onChanged={refreshSchedulesAndExpenses}
+          onChanged={fetchSchedules}
         />
       )}
 

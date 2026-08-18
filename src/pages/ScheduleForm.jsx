@@ -75,6 +75,11 @@ function ScheduleForm({ onClose, onCreated, schedule }) {
       return;
     }
 
+    if (endTime && endTime <= startTime) {
+      setError('종료 시간은 시작 시간보다 늦어야 해요.');
+      return;
+    }
+
     setError('');
     setIsSubmitting(true);
 

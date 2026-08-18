@@ -8,6 +8,7 @@ import { colors } from '../styles/colors';
 import { getCurrentUser } from '../utils/auth';
 import { apiFetch } from '../utils/api';
 import { toDisplayCategory } from '../utils/category';
+import AccessDenied from '../components/AccessDenied';
 
 const Page = styled.div`
   display: flex;
@@ -162,6 +163,7 @@ function ExpenseDetail() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
+  const [accessError, setAccessError] = useState('');
 
   useEffect(() => {
     let ignore = false;
@@ -182,8 +184,21 @@ function ExpenseDetail() {
               (p) => p.userId === currentUser?.userId,
             ) ?? null,
           );
+        } else if (groupResponse.status === 403) {
+          setAccessError('이 모임에 접근할 권한이 없어요.');
+        } else if (groupResponse.status === 404) {
+          setAccessError('모임을 찾을 수 없어요.');
         }
-        if (result.success) setExpense(result.data);
+
+        if (result.success) {
+          setExpense(result.data);
+        } else if (groupResult.success) {
+          if (expenseResponse.status === 403) {
+            setAccessError('이 지출을 볼 권한이 없어요.');
+          } else if (expenseResponse.status === 404) {
+            setAccessError('지출 내역을 찾을 수 없어요.');
+          }
+        }
         setIsLoading(false);
       }
     }
@@ -227,6 +242,15 @@ function ExpenseDetail() {
       setIsDeleting(false);
     }
   };
+
+  if (!isLoading && accessError) {
+    return (
+      <Page>
+        <Header />
+        <AccessDenied message={accessError} />
+      </Page>
+    );
+  }
 
   return (
     <Page>
