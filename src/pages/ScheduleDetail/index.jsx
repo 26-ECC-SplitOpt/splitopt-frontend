@@ -1,15 +1,14 @@
 import { useEffect, useState } from 'react';
 import styled from '@emotion/styled';
-import Modal from '../components/Modal';
-import Loading from '../components/Loading';
-import { PencilIcon, TrashIcon } from '../components/icons';
-import { getCategoryIcon } from '../utils/categoryIcon';
-import { toDisplayCategory } from '../utils/category';
-import { formatScheduleDateTime } from '../utils/scheduleDate';
-import { colors } from '../styles/colors';
-import { apiFetch } from '../utils/api';
-import ScheduleForm from './ScheduleForm';
-import ScheduleLinkExpense from './ScheduleLinkExpense';
+import Modal from '../../components/Modal';
+import Loading from '../../components/Loading';
+import { PencilIcon, TrashIcon } from '../../components/icons';
+import { formatScheduleDateTime } from '../../utils/scheduleDate';
+import { colors } from '../../styles/colors';
+import { apiFetch } from '../../utils/api';
+import ScheduleForm from '../ScheduleForm';
+import ScheduleLinkExpense from '../ScheduleLinkExpense';
+import ExpenseList from './ExpenseList';
 
 const ModalTitle = styled.h2`
   margin: 0 0 24px;
@@ -103,65 +102,6 @@ const TotalValue = styled.span`
   color: ${colors.body};
 `;
 
-const ExpenseCard = styled.div`
-  display: flex;
-  flex-direction: column;
-  border: 1px solid ${colors.border};
-  border-radius: 16px;
-  box-sizing: border-box;
-  overflow: hidden;
-`;
-
-const ExpenseRow = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 18px;
-  border-bottom: 1px solid ${colors.border};
-
-  &:last-of-type {
-    border-bottom: none;
-  }
-`;
-
-const ExpenseIconWrap = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-`;
-
-const ExpenseInfo = styled.div`
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-`;
-
-const ExpenseTitle = styled.p`
-  margin: 0;
-  font-family: 'DM Sans', sans-serif;
-  font-weight: 700;
-  font-size: 13px;
-  color: rgba(0, 0, 0, 0.7);
-`;
-
-const ExpensePayer = styled.p`
-  margin: 0;
-  font-family: 'DM Sans', sans-serif;
-  font-weight: 500;
-  font-size: 11px;
-  color: rgba(0, 0, 0, 0.5);
-`;
-
-const ExpenseAmount = styled.span`
-  flex-shrink: 0;
-  font-family: 'Inter', sans-serif;
-  font-weight: 700;
-  font-size: 14px;
-  color: ${colors.body};
-`;
-
 const EmptyMessage = styled.p`
   margin: 0;
   font-family: 'Inter', sans-serif;
@@ -203,25 +143,6 @@ const ErrorText = styled.p`
 
 function formatAmount(amount) {
   return `${amount.toLocaleString('ko-KR')}원`;
-}
-
-function UnlinkIcon() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 14 14"
-      fill="none"
-      aria-hidden="true"
-    >
-      <path
-        d="M2.5 2.5L11.5 11.5M11.5 2.5L2.5 11.5"
-        stroke="rgba(0, 0, 0, 0.4)"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
 }
 
 function ScheduleDetail({ groupId, scheduleId, onClose, onChanged }) {
@@ -415,40 +336,11 @@ function ScheduleDetail({ groupId, scheduleId, onClose, onChanged }) {
             <TotalValue>{formatAmount(schedule.totalExpense ?? 0)}</TotalValue>
           </TotalRow>
 
-          {schedule.expenses?.length > 0 ? (
-            <ExpenseCard>
-              {schedule.expenses.map((expense) => {
-                const CategoryIcon = getCategoryIcon(
-                  toDisplayCategory(expense.category),
-                );
-
-                return (
-                  <ExpenseRow key={expense.id}>
-                    <ExpenseIconWrap>
-                      <CategoryIcon />
-                    </ExpenseIconWrap>
-                    <ExpenseInfo>
-                      <ExpenseTitle>{expense.title}</ExpenseTitle>
-                      <ExpensePayer>{expense.payer?.name}</ExpensePayer>
-                    </ExpenseInfo>
-                    <ExpenseAmount>
-                      {formatAmount(expense.amount)}
-                    </ExpenseAmount>
-                    <IconButton
-                      type="button"
-                      aria-label="지출 연결 해제"
-                      onClick={() => handleUnlink(expense.id)}
-                      disabled={unlinkingId !== null}
-                    >
-                      <UnlinkIcon />
-                    </IconButton>
-                  </ExpenseRow>
-                );
-              })}
-            </ExpenseCard>
-          ) : (
-            <EmptyMessage>연결된 지출이 없습니다.</EmptyMessage>
-          )}
+          <ExpenseList
+            expenses={schedule.expenses}
+            unlinkingId={unlinkingId}
+            onUnlink={handleUnlink}
+          />
 
           {error && <ErrorText>{error}</ErrorText>}
 
