@@ -6,6 +6,7 @@ import { getCategoryIcon } from '../utils/categoryIcon';
 import { toDisplayCategory } from '../utils/category';
 import { colors } from '../styles/colors';
 import { apiFetch } from '../utils/api';
+import { formatScheduleDate } from '../utils/scheduleDate';
 
 const ModalTitle = styled.h2`
   margin: 0 0 24px;
@@ -191,7 +192,11 @@ function ScheduleLinkExpense({ groupId, scheduleId, onClose, onLinked }) {
                 </ExpenseIconWrap>
                 <ExpenseInfo>
                   <ExpenseTitle>{expense.title}</ExpenseTitle>
-                  <ExpensePayer>{expense.payer?.name}</ExpensePayer>
+                  <ExpensePayer>
+                    {expense.payer?.name}
+                    {expense.expenseDate &&
+                      ` · ${formatScheduleDate(expense.expenseDate)}`}
+                  </ExpensePayer>
                 </ExpenseInfo>
                 <ExpenseAmount>{formatAmount(expense.amount)}</ExpenseAmount>
               </ExpenseRow>
