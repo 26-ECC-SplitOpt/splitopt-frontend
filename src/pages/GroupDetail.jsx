@@ -675,6 +675,26 @@ function GroupDetail() {
     setSchedulesLoading(false);
   }
 
+  // 지출-일정 연결/해제 시 일정 목록의 합계도 최신 상태로 보이도록 지출 목록도
+  // 같이 다시 불러온다.
+  async function fetchExpenses() {
+    const response = await apiFetch(`/api/groups/${groupId}/expenses`);
+    const result = await response.json();
+
+    if (result.success) {
+      setExpenses(
+        (result.data ?? []).map((item) => ({
+          ...item,
+          category: toDisplayCategory(item.category),
+        })),
+      );
+    }
+  }
+
+  async function refreshSchedulesAndExpenses() {
+    await Promise.all([fetchSchedules(), fetchExpenses()]);
+  }
+
   useEffect(() => {
     if (activeTab !== 'schedule') return undefined;
 
@@ -1129,7 +1149,7 @@ function GroupDetail() {
           groupId={groupId}
           scheduleId={selectedScheduleId}
           onClose={() => setSelectedScheduleId(null)}
-          onChanged={fetchSchedules}
+          onChanged={refreshSchedulesAndExpenses}
         />
       )}
 
