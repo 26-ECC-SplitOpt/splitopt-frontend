@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import styled from '@emotion/styled';
 import Header from '../components/Header';
 import TitleBar from '../components/TitleBar';
+import Loading from '../components/Loading';
 import { colors } from '../styles/colors';
 import { apiFetch } from '../utils/api';
 
@@ -154,6 +155,7 @@ function MySettlement() {
   const [toSend, setToSend] = useState([]);
   const [toReceive, setToReceive] = useState([]);
   const [completed, setCompleted] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const applySettlementsMe = (data) => {
     setToSend(data.toSend);
@@ -168,8 +170,9 @@ function MySettlement() {
       const response = await apiFetch(`/api/groups/${groupId}/settlements/me`);
       const result = await response.json();
 
-      if (!ignore && result.success) {
-        applySettlementsMe(result.data);
+      if (!ignore) {
+        if (result.success) applySettlementsMe(result.data);
+        setIsLoading(false);
       }
     }
 
@@ -212,101 +215,109 @@ function MySettlement() {
       <Content>
         <TitleBar title="내 정산 확인" onBack={() => navigate(-1)} />
 
-        <Section>
-          <SectionTitle>내가 보낼 내역</SectionTitle>
-          {toSend.length > 0 ? (
-            <Box>
-              {toSend.map((item) => (
-                <ItemRow key={item.settlementId}>
-                  <ItemName>{item.counterpartName}</ItemName>
-                  <ItemRight>
-                    <ItemAmount>{formatAmount(item.amount)}</ItemAmount>
-                    {item.status === 'SENT' ? (
-                      <SentBadge
-                        type="button"
-                        clickable
-                        onClick={() =>
-                          updateStatus(item.settlementId, 'CANCEL')
-                        }
-                      >
-                        송금 완료/취소
-                      </SentBadge>
-                    ) : (
-                      <PendingBadge
-                        type="button"
-                        clickable
-                        onClick={() => updateStatus(item.settlementId, 'SEND')}
-                      >
-                        송금 전
-                      </PendingBadge>
-                    )}
-                  </ItemRight>
-                </ItemRow>
-              ))}
-            </Box>
-          ) : (
-            <Box>
-              <EmptyText>내가 보낼 내역이 없습니다.</EmptyText>
-            </Box>
-          )}
-        </Section>
+        {isLoading ? (
+          <Loading />
+        ) : (
+          <>
+            <Section>
+              <SectionTitle>내가 보낼 내역</SectionTitle>
+              {toSend.length > 0 ? (
+                <Box>
+                  {toSend.map((item) => (
+                    <ItemRow key={item.settlementId}>
+                      <ItemName>{item.counterpartName}</ItemName>
+                      <ItemRight>
+                        <ItemAmount>{formatAmount(item.amount)}</ItemAmount>
+                        {item.status === 'SENT' ? (
+                          <SentBadge
+                            type="button"
+                            clickable
+                            onClick={() =>
+                              updateStatus(item.settlementId, 'CANCEL')
+                            }
+                          >
+                            송금 완료/취소
+                          </SentBadge>
+                        ) : (
+                          <PendingBadge
+                            type="button"
+                            clickable
+                            onClick={() =>
+                              updateStatus(item.settlementId, 'SEND')
+                            }
+                          >
+                            송금 전
+                          </PendingBadge>
+                        )}
+                      </ItemRight>
+                    </ItemRow>
+                  ))}
+                </Box>
+              ) : (
+                <Box>
+                  <EmptyText>내가 보낼 내역이 없습니다.</EmptyText>
+                </Box>
+              )}
+            </Section>
 
-        <Section>
-          <SectionTitle>내가 받을 내역</SectionTitle>
-          {toReceive.length > 0 ? (
-            <Box>
-              {toReceive.map((item) => (
-                <ItemRow key={item.settlementId}>
-                  <ItemName>{item.counterpartName}</ItemName>
-                  <ItemRight>
-                    <ItemAmount>{formatAmount(item.amount)}</ItemAmount>
-                    {item.status === 'SENT' ? (
-                      <SentBadge
-                        type="button"
-                        clickable
-                        onClick={() =>
-                          updateStatus(item.settlementId, 'CONFIRM')
-                        }
-                      >
-                        송금 확인
-                      </SentBadge>
-                    ) : (
-                      <PendingBadge type="button" disabled>
-                        미송금
-                      </PendingBadge>
-                    )}
-                  </ItemRight>
-                </ItemRow>
-              ))}
-            </Box>
-          ) : (
-            <Box>
-              <EmptyText>내가 받을 내역이 없습니다.</EmptyText>
-            </Box>
-          )}
-        </Section>
+            <Section>
+              <SectionTitle>내가 받을 내역</SectionTitle>
+              {toReceive.length > 0 ? (
+                <Box>
+                  {toReceive.map((item) => (
+                    <ItemRow key={item.settlementId}>
+                      <ItemName>{item.counterpartName}</ItemName>
+                      <ItemRight>
+                        <ItemAmount>{formatAmount(item.amount)}</ItemAmount>
+                        {item.status === 'SENT' ? (
+                          <SentBadge
+                            type="button"
+                            clickable
+                            onClick={() =>
+                              updateStatus(item.settlementId, 'CONFIRM')
+                            }
+                          >
+                            송금 확인
+                          </SentBadge>
+                        ) : (
+                          <PendingBadge type="button" disabled>
+                            미송금
+                          </PendingBadge>
+                        )}
+                      </ItemRight>
+                    </ItemRow>
+                  ))}
+                </Box>
+              ) : (
+                <Box>
+                  <EmptyText>내가 받을 내역이 없습니다.</EmptyText>
+                </Box>
+              )}
+            </Section>
 
-        <Section>
-          <SectionTitle>정산 완료 내역</SectionTitle>
-          {completed.length > 0 ? (
-            <Box>
-              {completed.map((item) => (
-                <ItemRow key={item.settlementId}>
-                  <ItemName>{item.counterpartName}</ItemName>
-                  <ItemAmount>{formatAmount(item.amount)}</ItemAmount>
-                </ItemRow>
-              ))}
-            </Box>
-          ) : (
-            <Box>
-              <EmptyText>정산 완료 내역이 없습니다.</EmptyText>
-            </Box>
-          )}
-        </Section>
+            <Section>
+              <SectionTitle>정산 완료 내역</SectionTitle>
+              {completed.length > 0 ? (
+                <Box>
+                  {completed.map((item) => (
+                    <ItemRow key={item.settlementId}>
+                      <ItemName>{item.counterpartName}</ItemName>
+                      <ItemAmount>{formatAmount(item.amount)}</ItemAmount>
+                    </ItemRow>
+                  ))}
+                </Box>
+              ) : (
+                <Box>
+                  <EmptyText>정산 완료 내역이 없습니다.</EmptyText>
+                </Box>
+              )}
+            </Section>
 
-        <BackButtonBar onClick={() => navigate(-1)}>
-          <BackButtonInner>돌아가기</BackButtonInner>
-        </BackButtonBar>
+            <BackButtonBar onClick={() => navigate(-1)}>
+              <BackButtonInner>돌아가기</BackButtonInner>
+            </BackButtonBar>
+          </>
+        )}
       </Content>
     </Page>
   );

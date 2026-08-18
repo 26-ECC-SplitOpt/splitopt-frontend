@@ -3,9 +3,11 @@ import { useNavigate, useParams } from 'react-router-dom';
 import styled from '@emotion/styled';
 import Header from '../components/Header';
 import TitleBar from '../components/TitleBar';
+import Loading from '../components/Loading';
 import { colors } from '../styles/colors';
 import { getCurrentUser } from '../utils/auth';
 import { apiFetch } from '../utils/api';
+import { toDisplayCategory } from '../utils/category';
 
 const Page = styled.div`
   display: flex;
@@ -32,10 +34,6 @@ const Content = styled.main`
 const InfoRow = styled.div`
   display: flex;
   margin-top: 28px;
-
-  &:first-of-type {
-    margin-top: 52px;
-  }
 `;
 
 const InfoBlock = styled.div`
@@ -61,7 +59,7 @@ const InfoValue = styled.span`
 
 const Divider = styled.div`
   height: 1px;
-  margin-top: 34px;
+  margin-top: 40px;
   background-color: rgba(69, 75, 96, 0.2);
 `;
 
@@ -161,6 +159,7 @@ function ExpenseDetail() {
   const { groupId, expenseId } = useParams();
   const [expense, setExpense] = useState(null);
   const [myParticipant, setMyParticipant] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -185,6 +184,7 @@ function ExpenseDetail() {
           );
         }
         if (result.success) setExpense(result.data);
+        setIsLoading(false);
       }
     }
 
@@ -236,74 +236,88 @@ function ExpenseDetail() {
         <TitleBar
           title="지출 상세"
           onBack={() => navigate(`/groups/${groupId}`)}
+          style={{ marginBottom: '16px' }}
         />
 
-        <InfoRow>
-          <InfoBlock>
-            <InfoLabel>지출 일자</InfoLabel>
-            <InfoValue>{expense?.expenseDate ?? ''}</InfoValue>
-          </InfoBlock>
-        </InfoRow>
+        {isLoading ? (
+          <Loading />
+        ) : (
+          <>
+            <InfoRow>
+              <InfoBlock>
+                <InfoLabel>지출 일자</InfoLabel>
+                <InfoValue>{expense?.expenseDate ?? ''}</InfoValue>
+              </InfoBlock>
+            </InfoRow>
 
-        <InfoRow>
-          <InfoBlock>
-            <InfoLabel>지출 항목</InfoLabel>
-            <InfoValue>{expense?.title ?? ''}</InfoValue>
-          </InfoBlock>
-          <InfoBlock>
-            <InfoLabel>카테고리</InfoLabel>
-            <InfoValue>{expense?.category ?? ''}</InfoValue>
-          </InfoBlock>
-        </InfoRow>
+            <InfoRow>
+              <InfoBlock>
+                <InfoLabel>지출 항목</InfoLabel>
+                <InfoValue>{expense?.title ?? ''}</InfoValue>
+              </InfoBlock>
+              <InfoBlock>
+                <InfoLabel>카테고리</InfoLabel>
+                <InfoValue>
+                  {expense?.category ? toDisplayCategory(expense.category) : ''}
+                </InfoValue>
+              </InfoBlock>
+            </InfoRow>
 
-        <InfoRow>
-          <InfoBlock>
-            <InfoLabel>결제자</InfoLabel>
-            <InfoValue>{expense?.payer?.name ?? ''}</InfoValue>
-          </InfoBlock>
-          <InfoBlock>
-            <InfoLabel>금액</InfoLabel>
-            <InfoValue>{expense ? formatAmount(expense.amount) : ''}</InfoValue>
-          </InfoBlock>
-        </InfoRow>
+            <InfoRow>
+              <InfoBlock>
+                <InfoLabel>결제자</InfoLabel>
+                <InfoValue>{expense?.payer?.name ?? ''}</InfoValue>
+              </InfoBlock>
+              <InfoBlock>
+                <InfoLabel>금액</InfoLabel>
+                <InfoValue>
+                  {expense ? formatAmount(expense.amount) : ''}
+                </InfoValue>
+              </InfoBlock>
+            </InfoRow>
 
-        <Divider />
+            <Divider />
 
-        <SectionTitle>정산 부담 금액</SectionTitle>
+            <SectionTitle>정산 부담 금액</SectionTitle>
 
-        <ShareList>
-          {(expense?.shares ?? []).map((share) => (
-            <ShareRow key={share.participantId}>
-              <ShareName>{share.name}</ShareName>
-              <ShareAmount>{formatAmount(share.amount)}</ShareAmount>
-            </ShareRow>
-          ))}
-        </ShareList>
+            <ShareList>
+              {(expense?.shares ?? [])
+                .slice()
+                .sort((a, b) => b.amount - a.amount)
+                .map((share) => (
+                <ShareRow key={share.participantId}>
+                  <ShareName>{share.name}</ShareName>
+                  <ShareAmount>{formatAmount(share.amount)}</ShareAmount>
+                </ShareRow>
+              ))}
+            </ShareList>
 
-        {error && <ErrorText>{error}</ErrorText>}
+            {error && <ErrorText>{error}</ErrorText>}
 
-        {(isPayer || canDelete) && (
-          <ActionRow>
-            {isPayer && (
-              <EditButton
-                type="button"
-                onClick={() =>
-                  navigate(`/groups/${groupId}/expenses/${expenseId}/edit`)
-                }
-              >
-                수정하기
-              </EditButton>
+            {(isPayer || canDelete) && (
+              <ActionRow>
+                {isPayer && (
+                  <EditButton
+                    type="button"
+                    onClick={() =>
+                      navigate(`/groups/${groupId}/expenses/${expenseId}/edit`)
+                    }
+                  >
+                    수정하기
+                  </EditButton>
+                )}
+                {canDelete && (
+                  <DeleteButton
+                    type="button"
+                    onClick={handleDelete}
+                    disabled={isDeleting}
+                  >
+                    {isDeleting ? '삭제 중...' : '삭제하기'}
+                  </DeleteButton>
+                )}
+              </ActionRow>
             )}
-            {canDelete && (
-              <DeleteButton
-                type="button"
-                onClick={handleDelete}
-                disabled={isDeleting}
-              >
-                {isDeleting ? '삭제 중...' : '삭제하기'}
-              </DeleteButton>
-            )}
-          </ActionRow>
+          </>
         )}
       </Content>
     </Page>

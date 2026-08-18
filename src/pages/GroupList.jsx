@@ -2,9 +2,12 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import styled from '@emotion/styled';
 import Header from '../components/Header';
+import Loading from '../components/Loading';
 import { ChevronRightIcon } from '../components/icons';
 import { colors } from '../styles/colors';
 import { apiFetch } from '../utils/api';
+import GroupCreate from './GroupCreate';
+import InviteJoin from './InviteJoin';
 
 const STATUS_META = {
   NOT_STARTED: {
@@ -136,7 +139,7 @@ const ActionRow = styled.div`
   margin-top: ${(props) => (props.hasGroups ? '38px' : '32px')};
 `;
 
-const ActionButton = styled(Link)`
+const ActionButton = styled.button`
   flex: 1;
   display: flex;
   align-items: center;
@@ -145,11 +148,12 @@ const ActionButton = styled(Link)`
   height: 52px;
   background-color: ${colors.body};
   color: ${colors.white};
+  border: none;
   border-radius: 14px;
   font-family: 'Inter', sans-serif;
   font-weight: 700;
   font-size: 14px;
-  text-decoration: none;
+  cursor: pointer;
   box-sizing: border-box;
 
   &:hover {
@@ -160,13 +164,14 @@ const ActionButton = styled(Link)`
 function GroupList() {
   const [groups, setGroups] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [activeModal, setActiveModal] = useState(null);
 
   useEffect(() => {
     let ignore = false;
 
     async function fetchGroups() {
       try {
-        const response = await apiFetch('/api/groups');
+        const response = await apiFetch(`/api/groups`);
         const result = await response.json();
 
         if (!ignore && result.success) {
@@ -184,6 +189,15 @@ function GroupList() {
     };
   }, []);
 
+  async function refetchGroups() {
+    const response = await apiFetch(`/api/groups`);
+    const result = await response.json();
+
+    if (result.success) {
+      setGroups(result.data.groups);
+    }
+  }
+
   const hasGroups = groups.length > 0;
 
   return (
@@ -192,6 +206,8 @@ function GroupList() {
 
       <Content>
         <Title hasGroups={hasGroups}>내 모임</Title>
+
+        {isLoading && <Loading />}
 
         {!isLoading && !hasGroups && (
           <EmptyMessage>
@@ -233,10 +249,28 @@ function GroupList() {
         )}
 
         <ActionRow hasGroups={hasGroups}>
-          <ActionButton to="/groups/new">+ 새 모임 생성하기</ActionButton>
-          <ActionButton to="/groups/join">초대 코드 입력</ActionButton>
+          <ActionButton type="button" onClick={() => setActiveModal('create')}>
+            + 새 모임 생성하기
+          </ActionButton>
+          <ActionButton type="button" onClick={() => setActiveModal('join')}>
+            초대 코드 입력
+          </ActionButton>
         </ActionRow>
       </Content>
+
+      {activeModal === 'create' && (
+        <GroupCreate
+          onClose={() => setActiveModal(null)}
+          onCreated={async () => {
+            setActiveModal(null);
+            await refetchGroups();
+          }}
+        />
+      )}
+
+      {activeModal === 'join' && (
+        <InviteJoin onClose={() => setActiveModal(null)} />
+      )}
     </Page>
   );
 }

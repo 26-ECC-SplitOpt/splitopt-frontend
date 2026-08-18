@@ -35,7 +35,7 @@ const Content = styled.main`
 `;
 
 const BigLogo = styled.p`
-  margin: 0;
+  margin: 0 0 48px;
   font-family: 'DM Sans', sans-serif;
   font-weight: 700;
   font-size: 50px;
@@ -114,14 +114,11 @@ function SignUp() {
 
     try {
       const { name, email, password } = form;
-      const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL}/api/auth/signup`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, email, password }),
-        },
-      );
+      const response = await fetch(`/api/auth/signup`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, password }),
+      });
 
       const result = await response.json();
 

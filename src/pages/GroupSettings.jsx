@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import styled from '@emotion/styled';
 import Header from '../components/Header';
 import TitleBar from '../components/TitleBar';
+import Loading from '../components/Loading';
 import { colors } from '../styles/colors';
 import { Input, SubmitButton, ErrorText } from '../styles/authForm';
 import { apiFetch } from '../utils/api';
@@ -292,6 +293,7 @@ function GroupSettings() {
   const [isEditingMembers, setIsEditingMembers] = useState(false);
   const [isInviteExpired, setIsInviteExpired] = useState(false);
   const [removingUserId, setRemovingUserId] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
   const nameInputRef = useRef(null);
   const memoInputRef = useRef(null);
 
@@ -347,6 +349,7 @@ function GroupSettings() {
             : false,
         );
       }
+      if (!ignore) setIsLoading(false);
     }
 
     fetchGroup();
@@ -408,7 +411,7 @@ function GroupSettings() {
 
     try {
       const response = await apiFetch(`/api/groups/${groupId}`, {
-        method: 'PATCH',
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, description }),
       });
@@ -473,110 +476,116 @@ function GroupSettings() {
           }
         />
 
-        <form onSubmit={handleSave}>
-          <CardList>
-            <SettingsCard>
-              <CardLabel>초대 코드 생성</CardLabel>
-              <Row>
-                <CodeBox>{group?.inviteCode ?? ''}</CodeBox>
-                <CopyButton
-                  type="button"
-                  onClick={isInviteExpired ? handleReissueCode : handleCopyCode}
-                  disabled={isReissuing}
-                >
-                  {isInviteExpired
-                    ? isReissuing
-                      ? '재발급 중...'
-                      : '재발급'
-                    : copyLabel}
-                </CopyButton>
-              </Row>
-            </SettingsCard>
+        {isLoading ? (
+          <Loading />
+        ) : (
+          <form onSubmit={handleSave}>
+            <CardList>
+              <SettingsCard>
+                <CardLabel>초대 코드 생성</CardLabel>
+                <Row>
+                  <CodeBox>{group?.inviteCode ?? ''}</CodeBox>
+                  <CopyButton
+                    type="button"
+                    onClick={
+                      isInviteExpired ? handleReissueCode : handleCopyCode
+                    }
+                    disabled={isReissuing}
+                  >
+                    {isInviteExpired
+                      ? isReissuing
+                        ? '재발급 중...'
+                        : '재발급'
+                      : copyLabel}
+                  </CopyButton>
+                </Row>
+              </SettingsCard>
 
-            <SettingsCard>
-              <CardLabel>모임 이름</CardLabel>
-              <Row>
-                <EditableInput
-                  ref={nameInputRef}
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  required
-                />
-                <IconButton
-                  type="button"
-                  aria-label="모임 이름 수정"
-                  onClick={focusNameInput}
-                >
-                  <EditIcon />
-                </IconButton>
-              </Row>
-            </SettingsCard>
+              <SettingsCard>
+                <CardLabel>모임 이름</CardLabel>
+                <Row>
+                  <EditableInput
+                    ref={nameInputRef}
+                    value={name}
+                    onChange={(event) => setName(event.target.value)}
+                    required
+                  />
+                  <IconButton
+                    type="button"
+                    aria-label="모임 이름 수정"
+                    onClick={focusNameInput}
+                  >
+                    <EditIcon />
+                  </IconButton>
+                </Row>
+              </SettingsCard>
 
-            <SettingsCard>
-              <CardLabel>메모</CardLabel>
-              <Row>
-                <EditableInput
-                  ref={memoInputRef}
-                  placeholder="메모를 입력하세요"
-                  value={description}
-                  onChange={(event) => setDescription(event.target.value)}
-                />
-                <IconButton
-                  type="button"
-                  aria-label="메모 수정"
-                  onClick={focusMemoInput}
-                >
-                  <EditIcon />
-                </IconButton>
-              </Row>
-            </SettingsCard>
+              <SettingsCard>
+                <CardLabel>메모</CardLabel>
+                <Row>
+                  <EditableInput
+                    ref={memoInputRef}
+                    placeholder="메모를 입력하세요"
+                    value={description}
+                    onChange={(event) => setDescription(event.target.value)}
+                  />
+                  <IconButton
+                    type="button"
+                    aria-label="메모 수정"
+                    onClick={focusMemoInput}
+                  >
+                    <EditIcon />
+                  </IconButton>
+                </Row>
+              </SettingsCard>
 
-            <SettingsCard>
-              <CardLabel>참여자</CardLabel>
-              <MembersRow>
-                {isEditingMembers ? (
-                  <ChipList>
-                    {participants.map((p) => (
-                      <MemberChip key={p.userId}>
-                        {p.name}
-                        <RemoveChipButton
-                          type="button"
-                          aria-label={`${p.name} 삭제`}
-                          onClick={() => handleRemoveParticipant(p.userId)}
-                          disabled={removingUserId === p.userId}
-                        >
-                          <XIcon />
-                        </RemoveChipButton>
-                      </MemberChip>
-                    ))}
-                  </ChipList>
-                ) : (
-                  <MemberText>
-                    {participants.map((p) => p.name).join(' ⋅ ')}
-                  </MemberText>
-                )}
-                <OutlineButton
-                  type="button"
-                  onClick={() => setIsEditingMembers((prev) => !prev)}
-                >
-                  {isEditingMembers ? '완료' : '수정'}
-                </OutlineButton>
-              </MembersRow>
-            </SettingsCard>
-          </CardList>
+              <SettingsCard>
+                <CardLabel>참여자</CardLabel>
+                <MembersRow>
+                  {isEditingMembers ? (
+                    <ChipList>
+                      {participants.map((p) => (
+                        <MemberChip key={p.userId}>
+                          {p.name}
+                          <RemoveChipButton
+                            type="button"
+                            aria-label={`${p.name} 삭제`}
+                            onClick={() => handleRemoveParticipant(p.userId)}
+                            disabled={removingUserId === p.userId}
+                          >
+                            <XIcon />
+                          </RemoveChipButton>
+                        </MemberChip>
+                      ))}
+                    </ChipList>
+                  ) : (
+                    <MemberText>
+                      {participants.map((p) => p.name).join(' ⋅ ')}
+                    </MemberText>
+                  )}
+                  <OutlineButton
+                    type="button"
+                    onClick={() => setIsEditingMembers((prev) => !prev)}
+                  >
+                    {isEditingMembers ? '완료' : '수정'}
+                  </OutlineButton>
+                </MembersRow>
+              </SettingsCard>
+            </CardList>
 
-          {error && (
-            <ErrorText style={{ margin: '20px 0 0' }}>{error}</ErrorText>
-          )}
+            {error && (
+              <ErrorText style={{ margin: '20px 0 0' }}>{error}</ErrorText>
+            )}
 
-          <SubmitButton
-            type="submit"
-            disabled={isSubmitting}
-            style={{ marginTop: '86px' }}
-          >
-            {isSubmitting ? '변경 중...' : '변경하기'}
-          </SubmitButton>
-        </form>
+            <SubmitButton
+              type="submit"
+              disabled={isSubmitting}
+              style={{ marginTop: '86px' }}
+            >
+              {isSubmitting ? '변경 중...' : '변경하기'}
+            </SubmitButton>
+          </form>
+        )}
       </Content>
     </Page>
   );

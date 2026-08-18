@@ -189,6 +189,72 @@ export function EtcIcon({ size = 20, color = colors.body }) {
   );
 }
 
+export function PencilIcon({ size = 18, color = colors.label }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 18 18"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M11.6 2.9L15.1 6.4L6.2 15.3L2.4 15.6L2.7 11.8L11.6 2.9Z"
+        stroke={color}
+        strokeWidth="1.3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M10 4.5L13.5 8"
+        stroke={color}
+        strokeWidth="1.3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+export function TrashIcon({ size = 18, color = colors.label }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 18 18"
+      fill="none"
+      aria-hidden="true"
+    >
+      <path
+        d="M3.3 5.2H14.7"
+        stroke={color}
+        strokeWidth="1.3"
+        strokeLinecap="round"
+      />
+      <path
+        d="M7 5.2V3.4H11V5.2"
+        stroke={color}
+        strokeWidth="1.3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M4.6 5.2L5.2 15.1H12.8L13.4 5.2"
+        stroke={color}
+        strokeWidth="1.3"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M7.4 7.8V12.6M10.6 7.8V12.6"
+        stroke={color}
+        strokeWidth="1.1"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 export function ChevronRightIcon({ size = 16, color = colors.label }) {
   return (
     <svg
