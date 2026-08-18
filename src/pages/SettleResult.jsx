@@ -1,33 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import styled from '@emotion/styled';
-import Header from '../components/Header';
 import TitleBar from '../components/TitleBar';
-import Loading from '../components/Loading';
+import PageShell from '../components/PageShell';
 import { colors } from '../styles/colors';
 import { apiFetch } from '../utils/api';
-
-const Page = styled.div`
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
-  width: 100%;
-  max-width: 390px;
-  margin: 0 auto;
-  background-color: ${colors.white};
-  font-family: 'Inter', sans-serif;
-`;
-
-const Content = styled.main`
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  width: 100%;
-  max-width: 342px;
-  margin: 0 auto;
-  padding: 46px 24px 40px;
-  box-sizing: border-box;
-`;
 
 const SectionTitle = styled.p`
   margin: 37px 0 20px;
@@ -135,6 +112,7 @@ function SettleResult() {
   const [settlements, setSettlements] = useState([]);
   const [groupName, setGroupName] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  const [accessError, setAccessError] = useState('');
 
   useEffect(() => {
     let ignore = false;
@@ -148,7 +126,13 @@ function SettleResult() {
       const settlementsResult = await settlementsRes.json();
 
       if (!ignore) {
-        if (groupResult.success) setGroupName(groupResult.data.name);
+        if (groupResult.success) {
+          setGroupName(groupResult.data.name);
+        } else if (groupRes.status === 403) {
+          setAccessError('이 모임에 접근할 권한이 없어요.');
+        } else if (groupRes.status === 404) {
+          setAccessError('모임을 찾을 수 없어요.');
+        }
         if (settlementsResult.success) {
           setSettlements(settlementsResult.data.settlements);
         }
@@ -166,53 +150,43 @@ function SettleResult() {
   const hasSettlements = settlements.length > 0;
 
   return (
-    <Page>
-      <Header />
+    <PageShell
+      isLoading={isLoading}
+      accessError={accessError}
+      titleBar={<TitleBar title="정산 결과 조회" onBack={() => navigate(-1)} />}
+    >
+      <SectionTitle>
+        {groupName ? `${groupName} 정산 목록` : '정산 목록'}
+      </SectionTitle>
 
-      <Content>
-        <TitleBar title="정산 결과 조회" onBack={() => navigate(-1)} />
+      {hasSettlements ? (
+        <List>
+          {settlements.map((settlement) => (
+            <Row key={settlement.settlementId}>
+              <RowNames>
+                <RowText>
+                  {settlement.fromName} → {settlement.toName}
+                </RowText>
+                {settlement.status === 'COMPLETED' && (
+                  <DoneBadge>정산 완료</DoneBadge>
+                )}
+              </RowNames>
+              <RowAmount>
+                {settlement.amount.toLocaleString('ko-KR')}원
+              </RowAmount>
+            </Row>
+          ))}
+        </List>
+      ) : (
+        <EmptyWrap>
+          <EmptyMessage>정산할 내역이 없습니다.</EmptyMessage>
+        </EmptyWrap>
+      )}
 
-        {isLoading ? (
-          <Loading />
-        ) : (
-          <>
-            <SectionTitle>
-              {groupName ? `${groupName} 정산 목록` : '정산 목록'}
-            </SectionTitle>
-
-            {hasSettlements ? (
-              <List>
-                {settlements.map((settlement) => (
-                  <Row key={settlement.settlementId}>
-                    <RowNames>
-                      <RowText>
-                        {settlement.fromName} → {settlement.toName}
-                      </RowText>
-                      {settlement.status === 'COMPLETED' && (
-                        <DoneBadge>정산 완료</DoneBadge>
-                      )}
-                    </RowNames>
-                    <RowAmount>
-                      {settlement.amount.toLocaleString('ko-KR')}원
-                    </RowAmount>
-                  </Row>
-                ))}
-              </List>
-            ) : (
-              <EmptyWrap>
-                <EmptyMessage>정산할 내역이 없습니다.</EmptyMessage>
-              </EmptyWrap>
-            )}
-
-            <CheckButton
-              onClick={() => navigate(`/groups/${groupId}/settle/me`)}
-            >
-              <CheckButtonInner>내 정산 확인하기</CheckButtonInner>
-            </CheckButton>
-          </>
-        )}
-      </Content>
-    </Page>
+      <CheckButton onClick={() => navigate(`/groups/${groupId}/settle/me`)}>
+        <CheckButtonInner>내 정산 확인하기</CheckButtonInner>
+      </CheckButton>
+    </PageShell>
   );
 }
 

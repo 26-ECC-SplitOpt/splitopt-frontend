@@ -93,8 +93,10 @@ function ScheduleForm({ onClose, onCreated, schedule }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title,
-          startAt: new Date(`${date}T${startTime}`).toISOString(),
-          endAt: endTime ? new Date(`${date}T${endTime}`).toISOString() : null,
+          // UTC로 변환하면 서버가 그대로 시각으로 읽어서 9시간이 밀려서 저장됨.
+          // toISOString() 쓰지 말고 입력한 시각 그대로 보낸다.
+          startAt: `${date}T${startTime}:00`,
+          endAt: endTime ? `${date}T${endTime}:00` : null,
           memo,
         }),
       });

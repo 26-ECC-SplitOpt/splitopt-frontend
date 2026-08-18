@@ -1,36 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import styled from '@emotion/styled';
-import Header from '../components/Header';
 import TitleBar from '../components/TitleBar';
-import Loading from '../components/Loading';
+import PageShell from '../components/PageShell';
 import { colors } from '../styles/colors';
 import { getCurrentUser } from '../utils/auth';
 import { apiFetch } from '../utils/api';
 import { toDisplayCategory } from '../utils/category';
-import AccessDenied from '../components/AccessDenied';
-
-const Page = styled.div`
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
-  width: 100%;
-  max-width: 390px;
-  margin: 0 auto;
-  background-color: ${colors.white};
-  font-family: 'Inter', sans-serif;
-`;
-
-const Content = styled.main`
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  width: 100%;
-  max-width: 342px;
-  margin: 0 auto;
-  padding: 56px 24px 30px;
-  box-sizing: border-box;
-`;
 
 const InfoRow = styled.div`
   display: flex;
@@ -243,108 +219,92 @@ function ExpenseDetail() {
     }
   };
 
-  if (!isLoading && accessError) {
-    return (
-      <Page>
-        <Header />
-        <AccessDenied message={accessError} />
-      </Page>
-    );
-  }
-
   return (
-    <Page>
-      <Header />
-
-      <Content>
+    <PageShell
+      isLoading={isLoading}
+      accessError={accessError}
+      contentPadding="56px 24px 30px"
+      titleBar={
         <TitleBar
           title="지출 상세"
           onBack={() => navigate(`/groups/${groupId}`)}
           style={{ marginBottom: '16px' }}
         />
+      }
+    >
+      <InfoRow>
+        <InfoBlock>
+          <InfoLabel>지출 일자</InfoLabel>
+          <InfoValue>{expense?.expenseDate ?? ''}</InfoValue>
+        </InfoBlock>
+      </InfoRow>
 
-        {isLoading ? (
-          <Loading />
-        ) : (
-          <>
-            <InfoRow>
-              <InfoBlock>
-                <InfoLabel>지출 일자</InfoLabel>
-                <InfoValue>{expense?.expenseDate ?? ''}</InfoValue>
-              </InfoBlock>
-            </InfoRow>
+      <InfoRow>
+        <InfoBlock>
+          <InfoLabel>지출 항목</InfoLabel>
+          <InfoValue>{expense?.title ?? ''}</InfoValue>
+        </InfoBlock>
+        <InfoBlock>
+          <InfoLabel>카테고리</InfoLabel>
+          <InfoValue>
+            {expense?.category ? toDisplayCategory(expense.category) : ''}
+          </InfoValue>
+        </InfoBlock>
+      </InfoRow>
 
-            <InfoRow>
-              <InfoBlock>
-                <InfoLabel>지출 항목</InfoLabel>
-                <InfoValue>{expense?.title ?? ''}</InfoValue>
-              </InfoBlock>
-              <InfoBlock>
-                <InfoLabel>카테고리</InfoLabel>
-                <InfoValue>
-                  {expense?.category ? toDisplayCategory(expense.category) : ''}
-                </InfoValue>
-              </InfoBlock>
-            </InfoRow>
+      <InfoRow>
+        <InfoBlock>
+          <InfoLabel>결제자</InfoLabel>
+          <InfoValue>{expense?.payer?.name ?? ''}</InfoValue>
+        </InfoBlock>
+        <InfoBlock>
+          <InfoLabel>금액</InfoLabel>
+          <InfoValue>{expense ? formatAmount(expense.amount) : ''}</InfoValue>
+        </InfoBlock>
+      </InfoRow>
 
-            <InfoRow>
-              <InfoBlock>
-                <InfoLabel>결제자</InfoLabel>
-                <InfoValue>{expense?.payer?.name ?? ''}</InfoValue>
-              </InfoBlock>
-              <InfoBlock>
-                <InfoLabel>금액</InfoLabel>
-                <InfoValue>
-                  {expense ? formatAmount(expense.amount) : ''}
-                </InfoValue>
-              </InfoBlock>
-            </InfoRow>
+      <Divider />
 
-            <Divider />
+      <SectionTitle>정산 부담 금액</SectionTitle>
 
-            <SectionTitle>정산 부담 금액</SectionTitle>
+      <ShareList>
+        {(expense?.shares ?? [])
+          .slice()
+          .sort((a, b) => b.amount - a.amount)
+          .map((share) => (
+            <ShareRow key={share.participantId}>
+              <ShareName>{share.name}</ShareName>
+              <ShareAmount>{formatAmount(share.amount)}</ShareAmount>
+            </ShareRow>
+          ))}
+      </ShareList>
 
-            <ShareList>
-              {(expense?.shares ?? [])
-                .slice()
-                .sort((a, b) => b.amount - a.amount)
-                .map((share) => (
-                <ShareRow key={share.participantId}>
-                  <ShareName>{share.name}</ShareName>
-                  <ShareAmount>{formatAmount(share.amount)}</ShareAmount>
-                </ShareRow>
-              ))}
-            </ShareList>
+      {error && <ErrorText>{error}</ErrorText>}
 
-            {error && <ErrorText>{error}</ErrorText>}
-
-            {(isPayer || canDelete) && (
-              <ActionRow>
-                {isPayer && (
-                  <EditButton
-                    type="button"
-                    onClick={() =>
-                      navigate(`/groups/${groupId}/expenses/${expenseId}/edit`)
-                    }
-                  >
-                    수정하기
-                  </EditButton>
-                )}
-                {canDelete && (
-                  <DeleteButton
-                    type="button"
-                    onClick={handleDelete}
-                    disabled={isDeleting}
-                  >
-                    {isDeleting ? '삭제 중...' : '삭제하기'}
-                  </DeleteButton>
-                )}
-              </ActionRow>
-            )}
-          </>
-        )}
-      </Content>
-    </Page>
+      {(isPayer || canDelete) && (
+        <ActionRow>
+          {isPayer && (
+            <EditButton
+              type="button"
+              onClick={() =>
+                navigate(`/groups/${groupId}/expenses/${expenseId}/edit`)
+              }
+            >
+              수정하기
+            </EditButton>
+          )}
+          {canDelete && (
+            <DeleteButton
+              type="button"
+              onClick={handleDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? '삭제 중...' : '삭제하기'}
+            </DeleteButton>
+          )}
+        </ActionRow>
+      )}
+    </PageShell>
   );
 }
 

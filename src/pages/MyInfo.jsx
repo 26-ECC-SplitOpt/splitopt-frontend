@@ -1,33 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import styled from '@emotion/styled';
-import Header from '../components/Header';
 import TitleBar from '../components/TitleBar';
-import Loading from '../components/Loading';
+import PageShell from '../components/PageShell';
 import { colors } from '../styles/colors';
 import { clearSession, getRefreshToken } from '../utils/auth';
 import { apiFetch } from '../utils/api';
-
-const Page = styled.div`
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
-  width: 100%;
-  max-width: 390px;
-  margin: 0 auto;
-  background-color: ${colors.white};
-  font-family: 'Inter', sans-serif;
-`;
-
-const Content = styled.main`
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-  max-width: 342px;
-  margin: 0 auto;
-  padding: 47px 24px 40px;
-  box-sizing: border-box;
-`;
 
 const SectionLabel = styled.p`
   margin: 0 0 11px;
@@ -292,76 +270,71 @@ function MyInfo() {
   };
 
   return (
-    <Page>
-      <Header />
-
-      <Content>
-        <TitleBar
-          title="내 정보"
-          onBack={() => navigate(-1)}
-          style={{ marginBottom: '34px' }}
-        />
-
-        <SectionLabel>내 계정</SectionLabel>
-
-        {isLoading ? (
-          <Loading />
-        ) : (
-          <>
-            <Card>
-              <Row>
-                <RowLabel>이름</RowLabel>
-                {isEditingName ? (
-                  <RowRight>
-                    <NameInput
-                      ref={nameInputRef}
-                      value={nameInput}
-                      onChange={(event) => setNameInput(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === 'Enter') handleSaveName();
-                      }}
-                      maxLength={50}
-                    />
-                    <IconButton
-                      type="button"
-                      aria-label="이름 저장"
-                      onClick={handleSaveName}
-                      disabled={isSaving}
-                    >
-                      <CheckIcon />
-                    </IconButton>
-                  </RowRight>
-                ) : (
-                  <RowRight>
-                    <RowValue>{user?.name ?? ''}</RowValue>
-                    <IconButton
-                      type="button"
-                      aria-label="이름 수정"
-                      onClick={startEditingName}
-                    >
-                      <EditIcon />
-                    </IconButton>
-                  </RowRight>
-                )}
-              </Row>
-              <Row>
-                <RowLabel>이메일</RowLabel>
-                <RowLink href={`mailto:${user?.email ?? ''}`}>
-                  {user?.email ?? ''}
-                </RowLink>
-              </Row>
-              <Row isLast>
-                <LogoutButton type="button" onClick={handleLogout}>
-                  <RowLabel>로그아웃</RowLabel>
-                  <LogoutIcon />
-                </LogoutButton>
-              </Row>
-            </Card>
-            {nameError && <NameError>{nameError}</NameError>}
-          </>
-        )}
-      </Content>
-    </Page>
+    <PageShell
+      isLoading={isLoading}
+      contentPadding="47px 24px 40px"
+      titleBar={
+        <>
+          <TitleBar
+            title="내 정보"
+            onBack={() => navigate(-1)}
+            style={{ marginBottom: '34px' }}
+          />
+          <SectionLabel>내 계정</SectionLabel>
+        </>
+      }
+    >
+      <Card>
+        <Row>
+          <RowLabel>이름</RowLabel>
+          {isEditingName ? (
+            <RowRight>
+              <NameInput
+                ref={nameInputRef}
+                value={nameInput}
+                onChange={(event) => setNameInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') handleSaveName();
+                }}
+                maxLength={50}
+              />
+              <IconButton
+                type="button"
+                aria-label="이름 저장"
+                onClick={handleSaveName}
+                disabled={isSaving}
+              >
+                <CheckIcon />
+              </IconButton>
+            </RowRight>
+          ) : (
+            <RowRight>
+              <RowValue>{user?.name ?? ''}</RowValue>
+              <IconButton
+                type="button"
+                aria-label="이름 수정"
+                onClick={startEditingName}
+              >
+                <EditIcon />
+              </IconButton>
+            </RowRight>
+          )}
+        </Row>
+        <Row>
+          <RowLabel>이메일</RowLabel>
+          <RowLink href={`mailto:${user?.email ?? ''}`}>
+            {user?.email ?? ''}
+          </RowLink>
+        </Row>
+        <Row isLast>
+          <LogoutButton type="button" onClick={handleLogout}>
+            <RowLabel>로그아웃</RowLabel>
+            <LogoutIcon />
+          </LogoutButton>
+        </Row>
+      </Card>
+      {nameError && <NameError>{nameError}</NameError>}
+    </PageShell>
   );
 }
 

@@ -6,6 +6,7 @@ import Loading from '../components/Loading';
 import { ChevronRightIcon } from '../components/icons';
 import { colors } from '../styles/colors';
 import { apiFetch } from '../utils/api';
+import { Page, Content } from '../styles/layout';
 import GroupCreate from './GroupCreate';
 import InviteJoin from './InviteJoin';
 
@@ -26,28 +27,6 @@ const STATUS_META = {
     background: 'rgba(18, 177, 0, 0.12)',
   },
 };
-
-const Page = styled.div`
-  display: flex;
-  flex-direction: column;
-  min-height: 100vh;
-  width: 100%;
-  max-width: 390px;
-  margin: 0 auto;
-  background-color: ${colors.white};
-  font-family: 'Inter', sans-serif;
-`;
-
-const Content = styled.main`
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  width: 100%;
-  max-width: 342px;
-  margin: 0 auto;
-  padding: 50px 24px 40px;
-  box-sizing: border-box;
-`;
 
 const Title = styled.h1`
   margin: 0;
@@ -204,7 +183,7 @@ function GroupList() {
     <Page>
       <Header />
 
-      <Content>
+      <Content padding="50px 24px 40px">
         <Title hasGroups={hasGroups}>내 모임</Title>
 
         {isLoading && <Loading />}
